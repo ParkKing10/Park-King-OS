@@ -239,7 +239,9 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
       WHERE id = ?
     `).run(
       booking.name, booking.kennzeichen, booking.fahrzeug, booking.telefon,
-      booking.zeit, booking.rueckgabeZeit, booking.parkdatum, booking.rueckgabeDatum,
+      booking.type === 'checkout' ? null : booking.zeit,
+      booking.type === 'checkout' ? booking.zeit : booking.rueckgabeZeit,
+      booking.parkdatum, booking.rueckgabeDatum,
       booking.flug, booking.personen ? parseInt(booking.personen) : null,
       booking.tage ? parseInt(booking.tage) : null, null,
       booking.type === 'checkin' ? 'in' : booking.type === 'checkout' ? 'out' : null,
@@ -249,6 +251,7 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
   }
 
   // Insert new booking
+  const isCheckout = booking.type === 'checkout';
   const result = d.prepare(`
     INSERT INTO bookings (
       external_id, uid, company_id, type, status,
@@ -258,13 +261,13 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     booking.code || booking.uid, booking.uid, companyId,
-    booking.type === 'checkin' ? 'in' : booking.type === 'checkout' ? 'out' : 'in',
+    isCheckout ? 'out' : 'in',
     'new',
     booking.name, booking.telefon,
     booking.personen ? parseInt(booking.personen) : 1,
     booking.kennzeichen, booking.fahrzeug,
-    booking.parkdatum, booking.zeit,
-    booking.rueckgabeDatum || booking.rueckgabe, booking.rueckgabeZeit,
+    booking.parkdatum, isCheckout ? null : booking.zeit,
+    booking.rueckgabeDatum || booking.rueckgabe, isCheckout ? booking.zeit : booking.rueckgabeZeit,
     booking.flug, booking.tage ? parseInt(booking.tage) : null,
     'Park King', scrapedDate
   );

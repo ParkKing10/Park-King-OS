@@ -100,7 +100,7 @@ router.get('/bookings', requireAuth, (req, res) => {
     params.push(s, s, s, s);
   }
 
-  sql += ' ORDER BY CASE WHEN time_in IS NOT NULL THEN time_in ELSE time_out END ASC';
+  sql += ' ORDER BY COALESCE(time_in, time_out, "99:99") ASC';
 
   if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
