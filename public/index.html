@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#060B20">
+<title>Park King OS</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231E4ED8'/><text x='16' y='23' font-size='18' font-weight='bold' text-anchor='middle' fill='%23fff'>P</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --b9:#060B20;--b8:#0C1235;--b7:#101A4A;--b6:#1A2E8A;
+  --b5:#1E4ED8;--b4:#3B68F0;--b3:#7B9BF8;--b2:#B8CAFE;--b1:#E8EFFE;--b0:#F2F5FF;
+  --ac:#00D4FF;--gr:#10B981;--gr2:#ECFDF5;--gr3:#D1FAE5;
+  --rd:#EF4444;--rd2:#FEF2F2;--rd3:#FEE2E2;
+  --or:#F59E0B;--or2:#FFFBEB;
+  --tx:#0A0F2C;--t2:#4B5563;--t3:#9CA3AF;
+  --bdr:#E5EAFF;--wh:#FFFFFF;
+  --sh:0 1px 8px rgba(10,15,44,0.07);
+  --r:13px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Inter',sans-serif;background:#F0F2FF;min-height:100vh;color:var(--tx)}
+a{color:var(--b5);text-decoration:none}
+
+/* ── LOGIN ── */
+.login-page{min-height:100vh;background:linear-gradient(150deg,var(--b9),var(--b7) 55%,var(--b6));display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:40px 32px;width:100%;max-width:400px;backdrop-filter:blur(12px)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;justify-content:center}
+.login-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--b4),var(--ac));display:grid;place-items:center}
+.login-icon svg{width:22px;height:22px;fill:white}
+.login-title{color:white;font-size:20px;font-weight:900;letter-spacing:-.5px}
+.login-sub{color:var(--b3);font-size:11px;font-weight:500}
+.l-label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,0.4);margin-bottom:6px}
+.l-input{width:100%;padding:12px 16px;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.12);border-radius:var(--r);color:white;font-family:inherit;font-size:15px;outline:none;transition:border-color .2s}
+.l-input:focus{border-color:var(--ac)}
+.l-input::placeholder{color:rgba(255,255,255,0.25)}
+.l-group{margin-bottom:16px}
+.l-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--b4),var(--ac));border:none;border-radius:var(--r);color:white;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;transition:transform .1s,opacity .1s;letter-spacing:.3px}
+.l-btn:active{transform:scale(.97);opacity:.9}
+.l-error{color:#FCA5A5;font-size:12px;margin-top:10px;text-align:center;min-height:18px}
+
+/* ── APP SHELL ── */
+.app{display:none;min-height:100vh;flex-direction:column}
+.app.active{display:flex}
+
+/* Sidebar (desktop) */
+.app-layout{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--b9);display:none;flex-direction:column;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.06)}
+@media(min-width:900px){.sidebar{display:flex}}
+.sb-brand{padding:20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-brand-icon{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--b4),var(--ac));display:grid;place-items:center;flex-shrink:0}
+.sb-brand-icon svg{width:18px;height:18px;fill:white}
+.sb-brand-name{color:white;font-size:14px;font-weight:800}
+.sb-brand-sub{color:var(--b3);font-size:9px}
+.sb-nav{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.sb-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:rgba(255,255,255,0.5);font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit;width:100%;text-align:left;transition:all .12s}
+.sb-link:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8)}
+.sb-link.on{background:rgba(30,78,216,0.2);color:white}
+.sb-link svg{width:18px;height:18px;fill:currentColor;flex-shrink:0}
+.sb-link .badge{margin-left:auto;background:var(--rd);color:white;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px}
+.sb-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06)}
+.sb-user{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,0.5);font-size:11px}
+.sb-avatar{width:28px;height:28px;border-radius:8px;background:var(--b6);display:grid;place-items:center;font-size:11px;font-weight:800;color:white;flex-shrink:0}
+.sb-logout{background:none;border:none;color:rgba(255,255,255,0.3);font-size:10px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px}
+.sb-logout:hover{color:rgba(255,255,255,0.7)}
+
+/* Main content */
+.main-area{flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0}
+
+/* Top bar (mobile + desktop) */
+.topbar{background:white;padding:12px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--bdr);flex-shrink:0;position:sticky;top:0;z-index:100}
+.topbar-burger{display:none;background:none;border:none;cursor:pointer;padding:4px}
+@media(max-width:899px){.topbar-burger{display:flex}}
+.topbar-burger svg{width:22px;height:22px;fill:var(--tx)}
+.topbar-title{font-size:16px;font-weight:900;color:var(--tx);letter-spacing:-.3px}
+.topbar-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.top-btn{padding:8px 14px;border:1.5px solid var(--bdr);border-radius:10px;background:white;color:var(--b5);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:6px}
+.top-btn:hover{border-color:var(--b5);background:var(--b1)}
+.top-btn:active{transform:scale(.97)}
+.top-btn svg{width:14px;height:14px;fill:var(--b5)}
+.top-btn.primary{background:var(--b5);color:white;border-color:var(--b5)}
+.top-btn.primary svg{fill:white}
+.top-btn.primary:hover{background:var(--b4)}
+
+/* Company tabs */
+.company-tabs{display:flex;gap:6px;padding:12px 20px;background:white;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.co-tab{padding:8px 16px;border-radius:10px;border:1.5px solid var(--bdr);background:white;color:var(--t2);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.co-tab.on{background:var(--b5);color:white;border-color:var(--b5)}
+.co-tab:active{transform:scale(.97)}
+
+/* Stats strip */
+.stats-strip{display:flex;gap:8px;padding:12px 20px;background:linear-gradient(150deg,var(--b9),var(--b7));flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.stats-strip::-webkit-scrollbar{display:none}
+.stat-card{flex:1;min-width:90px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;text-align:center}
+.stat-n{font-size:22px;font-weight:900;line-height:1;color:white}
+.stat-n.ac{color:var(--ac)}.stat-n.gr{color:#34D399}.stat-n.rd{color:#FF7070}.stat-n.or{color:#FBBF24}
+.stat-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,0.4);margin-top:4px}
+.stat-money{font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px}
+
+/* Filter tabs */
+.filter-tabs{display:flex;gap:0;background:white;border-bottom:1px solid var(--bdr);padding:0 16px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.filter-tabs::-webkit-scrollbar{display:none}
+.ftab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--t3);border:none;background:none;font-family:inherit;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .12s}
+.ftab.on{color:var(--b5);border-bottom-color:var(--b5)}
+
+/* Search bar */
+.search-bar{padding:10px 20px;background:white;border-bottom:1px solid var(--bdr);flex-shrink:0;display:none}
+.search-bar.show{display:block}
+.search-input{width:100%;padding:10px 14px;border:1.5px solid var(--b2);border-radius:var(--r);font-family:inherit;font-size:14px;color:var(--tx);outline:none;background:var(--b0)}
+.search-input:focus{border-color:var(--b5)}
+
+/* Content scroll */
+.content{flex:1;overflow-y:auto;padding:8px 12px 20px}
+@media(min-width:900px){.content{padding:12px 20px 30px}}
+
+/* ── BOOKING ROWS ── */
+.brow{background:white;margin-bottom:6px;border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid var(--bdr);box-shadow:var(--sh);transition:transform .1s;display:flex;align-items:stretch}
+.brow:hover{box-shadow:0 2px 16px rgba(10,15,44,0.12)}
+.brow:active{transform:scale(.995)}
+.brow.noshow{opacity:.35;filter:grayscale(.6)}
+.brow-stripe{width:5px;flex-shrink:0}
+.bg-in{background:#EDFBF0!important}.bg-out{background:#FEF0F0!important}
+.bg-done{background:#F5FFF9!important}
+
+.brow-time-col{width:64px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;border-right:1px solid var(--bdr)}
+.brow-time{font-size:15px;font-weight:900;color:var(--tx);font-family:'JetBrains Mono',monospace;line-height:1}
+
+.brow-main{flex:1;padding:8px 10px;min-width:0}
+.brow-row1{display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap}
+.ptag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;border:1px solid;white-space:nowrap;flex-shrink:0}
+.brow-plate{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:var(--tx);letter-spacing:-.3px}
+.brow-name{font-size:12px;color:var(--t2);font-weight:500}
+.brow-car{font-size:11px;color:var(--t3)}
+
+.brow-right{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding:8px 12px 8px 4px;gap:5px;flex-shrink:0}
+.price-tag{font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;border:1.5px solid}
+.price-due{background:var(--rd2);color:var(--rd);border-color:var(--rd)}
+.price-paid{background:var(--gr2);color:var(--gr);border-color:var(--gr)}
+.pax-tag{display:flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--t3)}
+.key-badge{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.key-in{background:var(--gr2);border:1px solid rgba(16,185,129,0.3);color:var(--gr)}
+.key-out{background:var(--rd2);border:1px solid rgba(239,68,68,0.25);color:var(--rd)}
+
+/* ── DETAIL VIEW ── */
+.detail-view{display:none;flex-direction:column;min-height:100vh}
+.detail-view.active{display:flex}
+.det-hero{background:linear-gradient(150deg,var(--b9),var(--b7));padding:16px 24px 20px;flex-shrink:0;position:relative;overflow:hidden}
+.det-hero::after{content:'';position:absolute;top:-30px;right:-20px;width:140px;height:140px;background:radial-gradient(circle,rgba(0,212,255,0.12),transparent 70%);border-radius:50%}
+.det-back{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.8);font-size:14px;font-weight:600;font-family:inherit;margin-bottom:12px}
+.det-back svg{width:18px;height:18px;fill:rgba(255,255,255,0.8)}
+.det-id{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--b3);margin-bottom:10px}
+.det-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(min-width:600px){.det-grid{grid-template-columns:1fr 1fr 1fr 1fr}}
+.det-box{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px}
+.det-lbl{font-size:9px;color:rgba(255,255,255,0.4);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.det-val{color:white;font-size:13px;font-weight:700}
+.det-sub{color:var(--b3);font-size:10px;margin-top:2px}
+.det-link{color:var(--ac);font-size:10px;cursor:pointer}
+.det-content{flex:1;overflow-y:auto;padding:16px 20px 30px}
+@media(min-width:600px){.det-content{max-width:800px}}
+
+.date-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.dbox{background:white;border-radius:12px;padding:14px;border:1px solid var(--bdr);box-shadow:var(--sh);position:relative;overflow:hidden}
+.dbox::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.dbox.ci::before{background:linear-gradient(90deg,var(--b5),var(--ac))}
+.dbox.co::before{background:linear-gradient(90deg,var(--rd),#FF8C42)}
+.dbox-lbl{font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.dbox-date{font-size:14px;font-weight:800;color:var(--tx)}
+.dbox-time{font-size:11px;color:var(--t2);margin-top:2px}
+.dbox-status{font-size:10px;font-weight:700;margin-top:4px}
+.dbox-btn{width:100%;padding:8px;border:none;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;margin-top:8px}
+.ci-btn{background:var(--b5);color:white}
+.co-btn{background:var(--rd);color:white}
+
+.card{background:white;border-radius:12px;overflow:hidden;margin-bottom:10px;box-shadow:var(--sh);border:1px solid var(--bdr)}
+.card-hd{padding:10px 14px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr)}
+.card-bd{padding:12px 14px}
+.cost-row{display:flex;justify-content:space-between;font-size:12px;color:var(--t2);padding:4px 0;border-bottom:1px solid var(--bdr)}
+.cost-row:last-child{border-bottom:none}
+.cost-due{display:flex;justify-content:space-between;font-size:14px;font-weight:800;color:var(--rd);padding:8px 0 2px;border-top:2px solid var(--rd3)}
+.cost-paid{display:flex;justify-content:space-between;font-size:14px;font-weight:800;color:var(--gr);padding:8px 0 2px;border-top:2px solid var(--gr3)}
+.action-btns{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.act-btn{flex:1;min-width:120px;padding:12px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .1s}
+.act-btn:active{transform:scale(.97)}
+.act-primary{background:var(--b5);color:white;box-shadow:0 3px 10px rgba(30,78,216,0.22)}
+.act-danger{background:var(--rd);color:white}
+.act-outline{background:white;color:var(--b5);border:1.5px solid var(--b2)}
+
+/* Log */
+.log-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);align-items:flex-start}
+.log-item:last-child{border-bottom:none}
+.log-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;margin-top:2px}
+.log-dot svg{width:12px;height:12px;fill:white}
+.log-text{font-size:12px;font-weight:700;color:var(--tx)}
+.log-user{font-size:10px;color:var(--t3)}
+.log-time{font-size:11px;font-weight:700;color:var(--t2);font-family:'JetBrains Mono',monospace;flex-shrink:0;margin-left:auto}
+
+/* ── ADMIN: Users ── */
+.user-card{background:white;border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;box-shadow:var(--sh)}
+.user-avatar{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:14px;font-weight:800;color:white;flex-shrink:0}
+.user-name{font-size:14px;font-weight:700;color:var(--tx)}
+.user-role{font-size:11px;color:var(--t3)}
+.user-actions{margin-left:auto;display:flex;gap:6px}
+
+/* Toast */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(80px);padding:10px 22px;border-radius:50px;font-size:13px;font-weight:700;font-family:inherit;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.25);color:white}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Mobile bottom nav */
+.mob-nav{display:none;background:white;border-top:1px solid var(--bdr);padding:6px 8px 20px;position:fixed;bottom:0;left:0;right:0;z-index:100}
+@media(max-width:899px){.mob-nav{display:grid;grid-template-columns:repeat(4,1fr)}}
+.mob-tab{display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:none;font-family:inherit;cursor:pointer;padding:6px;border-radius:8px}
+.mob-tab svg{width:20px;height:20px;fill:var(--t3)}
+.mob-tab span{font-size:9px;color:var(--t3);font-weight:500}
+.mob-tab.on svg{fill:var(--b5)}.mob-tab.on span{color:var(--b5);font-weight:700}
+@media(max-width:899px){.content{padding-bottom:80px}}
+
+/* Empty state */
+.empty-state{text-align:center;padding:60px 20px;color:var(--t3)}
+.empty-state .icon{font-size:36px;margin-bottom:12px}
+.empty-state .title{font-size:14px;font-weight:700;color:var(--t2);margin-bottom:4px}
+.empty-state .sub{font-size:12px}
+
+/* Loading */
+.spinner{width:28px;height:28px;border:3px solid var(--bdr);border-top-color:var(--b5);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-state{display:flex;flex-direction:column;align-items:center;gap:12px;padding:60px 20px;color:var(--t2);font-size:13px}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:white;border-radius:16px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.modal-hd{padding:16px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:800;color:var(--tx)}
+.modal-close{background:none;border:none;cursor:pointer;font-size:20px;color:var(--t3);padding:4px}
+.modal-bd{padding:16px 20px}
+.modal-ft{padding:12px 20px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end}
+.m-label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-bottom:4px}
+.m-input{width:100%;padding:10px 14px;border:1.5px solid var(--bdr);border-radius:10px;font-family:inherit;font-size:14px;color:var(--tx);outline:none}
+.m-input:focus{border-color:var(--b5)}
+.m-group{margin-bottom:14px}
+.m-btn{padding:10px 20px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:transform .1s}
+.m-btn:active{transform:scale(.97)}
+.m-btn-primary{background:var(--b5);color:white}
+.m-btn-outline{background:white;color:var(--t2);border:1.5px solid var(--bdr)}
+
+/* Responsive booking grid for desktop */
+@media(min-width:900px){
+  .content{max-width:none}
+  .brow{margin-bottom:4px}
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.brow{animation:fadeIn .2s ease forwards}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div class="login-page" id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-icon"><svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/></svg></div>
+      <div><div class="login-title">Park King OS</div><div class="login-sub">Parkplatz-Management</div></div>
+    </div>
+    <div class="l-group"><label class="l-label">Benutzername</label><input class="l-input" id="loginUser" placeholder="admin" autofocus></div>
+    <div class="l-group"><label class="l-label">Passwort</label><input class="l-input" id="loginPass" type="password" placeholder="••••••"></div>
+    <button class="l-btn" onclick="doLogin()">EINLOGGEN</button>
+    <div class="l-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div class="app" id="app">
+  <div class="app-layout">
+
+    <!-- Sidebar (desktop) -->
+    <div class="sidebar" id="sidebar">
+      <div class="sb-brand">
+        <div class="sb-brand-icon"><svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/></svg></div>
+        <div><div class="sb-brand-name">Park King OS</div><div class="sb-brand-sub" id="sbRole">Admin</div></div>
+      </div>
+      <div class="sb-nav">
+        <button class="sb-link on" onclick="navTo('bookings')" data-nav="bookings"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>Buchungen</button>
+        <button class="sb-link" onclick="navTo('detail')" data-nav="detail" style="display:none"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>Detail</button>
+        <button class="sb-link" onclick="navTo('users')" data-nav="users" id="sbUsersLink"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Mitarbeiter</button>
+      </div>
+      <div class="sb-footer">
+        <div class="sb-user"><div class="sb-avatar" id="sbAvatar">A</div><div><span id="sbName">Admin</span></div></div>
+        <button class="sb-logout" onclick="doLogout()">Ausloggen</button>
+      </div>
+    </div>
+
+    <!-- Main Area -->
+    <div class="main-area">
+
+      <!-- ═══ PAGE: BOOKINGS ═══ -->
+      <div id="page-bookings">
+        <div class="topbar">
+          <button class="topbar-burger" onclick="toggleMobileMenu()"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+          <div class="topbar-title">Buchungen</div>
+          <div class="topbar-right">
+            <button class="top-btn" onclick="toggleSearch()"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>Suche</button>
+            <button class="top-btn primary" onclick="doScrape()"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Aktualisieren</button>
+          </div>
+        </div>
+
+        <div class="search-bar" id="searchBar">
+          <input class="search-input" id="searchInput" placeholder="Kennzeichen, Name, Telefon oder Buchungs-ID..." oninput="doSearch()">
+        </div>
+
+        <div class="company-tabs" id="companyTabs"></div>
+
+        <div class="stats-strip" id="statsStrip">
+          <div class="stat-card"><div class="stat-n ac" id="stTotal">–</div><div class="stat-l">Gesamt</div></div>
+          <div class="stat-card"><div class="stat-n gr" id="stIn">–</div><div class="stat-l">Annahmen</div></div>
+          <div class="stat-card"><div class="stat-n rd" id="stOut">–</div><div class="stat-l">Rückgaben</div></div>
+          <div class="stat-card"><div class="stat-n or" id="stOpen">–</div><div class="stat-l">Offen</div></div>
+          <div class="stat-card"><div class="stat-n" style="color:#FF7070" id="stDue">–</div><div class="stat-l">Fällig</div><div class="stat-money" id="stPaid"></div></div>
+        </div>
+
+        <div class="filter-tabs">
+          <button class="ftab on" onclick="setFilter('all',this)">Alle</button>
+          <button class="ftab" onclick="setFilter('in',this)">Annahme</button>
+          <button class="ftab" onclick="setFilter('out',this)">Abgabe</button>
+          <button class="ftab" onclick="setFilter('due',this)">Offen</button>
+          <button class="ftab" onclick="setFilter('checked',this)">Erledigt</button>
+        </div>
+
+        <div class="content" id="bookingList">
+          <div class="loading-state"><div class="spinner"></div>Buchungen werden geladen...</div>
+        </div>
+      </div>
+
+      <!-- ═══ PAGE: DETAIL ═══ -->
+      <div id="page-detail" style="display:none">
+        <div class="det-hero">
+          <button class="det-back" onclick="navTo('bookings')"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Zurück</button>
+          <div class="det-id" id="detId"></div>
+          <div class="det-grid" id="detGrid"></div>
+        </div>
+        <div class="det-content" id="detContent"></div>
+      </div>
+
+      <!-- ═══ PAGE: USERS (admin) ═══ -->
+      <div id="page-users" style="display:none">
+        <div class="topbar">
+          <button class="topbar-burger" onclick="toggleMobileMenu()"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+          <div class="topbar-title">Mitarbeiter</div>
+          <div class="topbar-right">
+            <button class="top-btn primary" onclick="openAddUser()"><svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Neuer Mitarbeiter</button>
+          </div>
+        </div>
+        <div class="content" id="userList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile bottom nav -->
+  <div class="mob-nav">
+    <button class="mob-tab on" onclick="navTo('bookings')" data-mob="bookings"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg><span>Buchungen</span></button>
+    <button class="mob-tab" onclick="navTo('users')" data-mob="users"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Team</span></button>
+    <button class="mob-tab" onclick="doScrape()"><svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg><span>Sync</span></button>
+    <button class="mob-tab" onclick="doLogout()"><svg viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><span>Logout</span></button>
+  </div>
+</div>
+
+<!-- Modal for adding users -->
+<div class="modal-bg" id="userModal" onclick="if(event.target===this)closeUserModal()">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Neuer Mitarbeiter</div><button class="modal-close" onclick="closeUserModal()">✕</button></div>
+    <div class="modal-bd">
+      <div class="m-group"><label class="m-label">Anzeigename</label><input class="m-input" id="newUserName" placeholder="z.B. Klaus Biemann"></div>
+      <div class="m-group"><label class="m-label">Benutzername</label><input class="m-input" id="newUserUsername" placeholder="z.B. klaus"></div>
+      <div class="m-group"><label class="m-label">Passwort</label><input class="m-input" id="newUserPass" type="password" placeholder="Mindestens 6 Zeichen"></div>
+      <div class="m-group"><label class="m-label">Rolle</label>
+        <select class="m-input" id="newUserRole"><option value="staff">Mitarbeiter</option><option value="admin">Admin</option></select>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="m-btn m-btn-outline" onclick="closeUserModal()">Abbrechen</button>
+      <button class="m-btn m-btn-primary" onclick="createUser()">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//  Park King OS — Frontend Logic
+// ═══════════════════════════════════════════════════════════════════════
+
+let token = localStorage.getItem('pk_token') || '';
+let user = JSON.parse(localStorage.getItem('pk_user') || 'null');
+let bookings = [];
+let companies = [];
+let currentCompany = localStorage.getItem('pk_company') || '';
+let currentFilter = 'all';
+let currentPage = 'bookings';
+
+// ─── API helper ─────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  if (res.status === 401) { doLogout(); throw new Error('Session abgelaufen'); }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || data.detail || 'Fehler');
+  return data;
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────
+async function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  if (!username || !password) return;
+  try {
+    const data = await api('POST', '/auth/login', { username, password });
+    token = data.token;
+    user = data.user;
+    localStorage.setItem('pk_token', token);
+    localStorage.setItem('pk_user', JSON.stringify(user));
+    document.getElementById('loginError').textContent = '';
+    showApp();
+  } catch (e) {
+    document.getElementById('loginError').textContent = e.message;
+  }
+}
+
+function doLogout() {
+  token = ''; user = null;
+  localStorage.removeItem('pk_token');
+  localStorage.removeItem('pk_user');
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('loginPage').style.display = '';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+function showApp() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+  // Update UI with user info
+  document.getElementById('sbName').textContent = user.name || user.username;
+  document.getElementById('sbAvatar').textContent = (user.name || user.username).charAt(0).toUpperCase();
+  document.getElementById('sbRole').textContent = user.role === 'admin' ? 'Admin' : 'Mitarbeiter';
+  // Hide admin features for staff
+  if (user.role !== 'admin') {
+    document.getElementById('sbUsersLink').style.display = 'none';
+  }
+  loadCompanies();
+}
+
+// ─── Companies ──────────────────────────────────────────────────────
+async function loadCompanies() {
+  try {
+    companies = await api('GET', '/companies');
+    const tabs = document.getElementById('companyTabs');
+    tabs.innerHTML = companies.map(c =>
+      `<button class="co-tab ${c.id === currentCompany || (!currentCompany && c.id === companies[0]?.id) ? 'on' : ''}" onclick="selectCompany('${c.id}')">${c.name}</button>`
+    ).join('');
+    if (!currentCompany && companies.length) currentCompany = companies[0].id;
+    loadBookings();
+  } catch (e) { toast('⚠ ' + e.message, 'var(--rd)'); }
+}
+
+function selectCompany(id) {
+  currentCompany = id;
+  localStorage.setItem('pk_company', id);
+  document.querySelectorAll('.co-tab').forEach(t => t.classList.toggle('on', t.textContent.trim() === companies.find(c=>c.id===id)?.name));
+  loadBookings();
+}
+
+// ─── Bookings ───────────────────────────────────────────────────────
+async function loadBookings() {
+  const list = document.getElementById('bookingList');
+  list.innerHTML = '<div class="loading-state"><div class="spinner"></div>Buchungen werden geladen...</div>';
+  try {
+    const params = new URLSearchParams({ company: currentCompany });
+    const search = document.getElementById('searchInput')?.value?.trim();
+    if (search) params.set('search', search);
+    const data = await api('GET', '/bookings?' + params);
+    bookings = data.bookings || [];
+    updateStats(data.stats);
+    renderBookings();
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="title">${e.message}</div><div class="sub"><button class="top-btn primary" onclick="doScrape()" style="margin-top:12px">Jetzt scrapen</button></div></div>`;
+  }
+}
+
+function updateStats(s) {
+  if (!s) return;
+  document.getElementById('stTotal').textContent = s.total || 0;
+  document.getElementById('stIn').textContent = s.annahmen || 0;
+  document.getElementById('stOut').textContent = s.rueckgaben || 0;
+  document.getElementById('stOpen').textContent = s.offen || 0;
+  const due = (s.total_due || 0) - (s.total_paid || 0);
+  document.getElementById('stDue').textContent = due.toFixed(2).replace('.', ',') + ' €';
+  document.getElementById('stPaid').textContent = 'Bezahlt: ' + (s.total_paid || 0).toFixed(2).replace('.', ',') + ' €';
+}
+
+function renderBookings() {
+  const list = document.getElementById('bookingList');
+  let filtered = bookings;
+  if (currentFilter === 'in') filtered = bookings.filter(b => b.type === 'in');
+  else if (currentFilter === 'out') filtered = bookings.filter(b => b.type === 'out');
+  else if (currentFilter === 'due') filtered = bookings.filter(b => b.status === 'new' || b.status === 'pending' || b.status === 'due');
+  else if (currentFilter === 'checked') filtered = bookings.filter(b => b.status === 'checked');
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div class="title">Keine Buchungen</div><div class="sub">Klicke "Aktualisieren" um Daten aus ParkingPro zu laden</div></div>';
+    return;
+  }
+
+  // Sort by time
+  filtered.sort((a, b) => {
+    const at = a.type === 'in' ? (a.time_in || '') : (a.time_out || '');
+    const bt = b.type === 'in' ? (b.time_in || '') : (b.time_out || '');
+    return at.localeCompare(bt);
+  });
+
+  list.innerHTML = filtered.map((b, i) => {
+    const isOut = b.type === 'out';
+    const isChecked = b.status === 'checked';
+    const isNoShow = b.status === 'noshow';
+    const stripe = isOut ? '#DC2626' : '#16A34A';
+    const bg = isChecked ? 'bg-done' : isOut ? 'bg-out' : 'bg-in';
+    const time = isOut ? (b.time_out || b.time_in || '–') : (b.time_in || '–');
+    const priceHtml = b.price > 0
+      ? `<span class="price-tag ${b.paid ? 'price-paid' : 'price-due'}">${b.paid ? '✓ ' : ''}${Number(b.price).toFixed(2).replace('.', ',')} €</span>` : '';
+    const keyHtml = `<span class="key-badge ${b.key_handed_in ? 'key-in' : 'key-out'}">${b.key_handed_in ? '🔑 Abgegeben' : '🔑 Schlüssellos'}</span>`;
+    const carSuffix = b.car && b.car !== '—' ? ` – ${b.car}` : '';
+
+    return `<div class="brow ${bg} ${isNoShow?'noshow':''}" style="animation-delay:${Math.min(i,20)*0.02}s" onclick="openDetail(${b.id})">
+      <div class="brow-stripe" style="background:${stripe}"></div>
+      <div class="brow-time-col"><div class="brow-time">${time}</div></div>
+      <div class="brow-main">
+        <div class="brow-row1">
+          <span class="ptag" style="background:${isOut?'var(--rd2)':'var(--gr2)'};border-color:${isOut?'var(--rd)':'var(--gr)'};color:${isOut?'var(--rd)':'var(--gr)'}">${isOut ? 'Rückgabe' : 'Annahme'}</span>
+          ${b.provider && b.provider !== 'Park King' ? `<span class="ptag" style="background:#F5F3FF;border-color:#8B5CF6;color:#6D28D9">${b.provider}</span>` : ''}
+        </div>
+        <div class="brow-plate">${b.plate || '–'}${carSuffix ? `<span style="color:var(--t3);font-weight:500;font-size:12px;font-family:Inter,sans-serif">${carSuffix}</span>` : ''}</div>
+        <div class="brow-name">${b.name || '–'}</div>
+      </div>
+      <div class="brow-right">
+        ${priceHtml}
+        <div class="pax-tag"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:var(--t3)"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>${b.pax || 1}</div>
+        ${keyHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  renderBookings();
+}
+
+function doSearch() { loadBookings(); }
+function toggleSearch() {
+  const bar = document.getElementById('searchBar');
+  bar.classList.toggle('show');
+  if (bar.classList.contains('show')) document.getElementById('searchInput').focus();
+  else { document.getElementById('searchInput').value = ''; loadBookings(); }
+}
+
+// ─── Detail ─────────────────────────────────────────────────────────
+async function openDetail(id) {
+  navTo('detail');
+  const detGrid = document.getElementById('detGrid');
+  const detContent = document.getElementById('detContent');
+  detContent.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+
+  try {
+    const data = await api('GET', '/bookings/' + id);
+    const b = data.booking;
+    const log = data.log || [];
+
+    document.getElementById('detId').textContent = `Buchung #${b.external_id || b.id} · ${b.company_id}`;
+
+    detGrid.innerHTML = `
+      <div class="det-box"><div class="det-lbl">Kunde</div><div class="det-val">${b.name||'–'}</div>${b.phone?`<div class="det-link">${b.phone}</div>`:''}</div>
+      <div class="det-box"><div class="det-lbl">Fahrzeug</div><div class="det-val" style="font-family:'JetBrains Mono',monospace">${b.plate||'–'}</div>${b.car?`<div class="det-sub">${b.car}</div>`:''}</div>
+      <div class="det-box"><div class="det-lbl">Status</div><div class="det-val">${b.status==='checked'?'✓ Erledigt':b.status==='noshow'?'✗ No Show':b.status==='due'?'⏳ Fällig':'Offen'}</div></div>
+      <div class="det-box"><div class="det-lbl">Typ</div><div class="det-val" style="color:${b.type==='out'?'#FF7070':'#34D399'}">${b.type==='out'?'Rückgabe':'Annahme'}</div></div>
+    `;
+
+    const priceDisplay = b.price > 0 ? `
+      <div class="card"><div class="card-hd">Kostenübersicht</div><div class="card-bd">
+        <div class="cost-row"><span>Parken${b.days?' · '+b.days+' Tage':''}</span><span>${Number(b.price).toFixed(2).replace('.',',')} €</span></div>
+        ${b.paid
+          ? `<div class="cost-paid"><span>Bezahlt (${b.paid_method||'–'})</span><span>${Number(b.price).toFixed(2).replace('.',',')} €</span></div>`
+          : `<div class="cost-due"><span>Fällig</span><span>${Number(b.price).toFixed(2).replace('.',',')} €</span></div>`
+        }
+      </div></div>` : '';
+
+    const logHtml = log.length ? log.map(l => `
+      <div class="log-item">
+        <div class="log-dot" style="background:${l.action.includes('check')?'var(--gr)':l.action==='paid'?'var(--b5)':l.action==='noshow'?'var(--t3)':'var(--or)'}">
+          <svg viewBox="0 0 24 24"><path d="${l.action.includes('check')?'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z':'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'}"/></svg>
+        </div>
+        <div style="flex:1"><div class="log-text">${l.action.replace('_',' ')}</div><div class="log-user">${l.user_name||'System'}</div></div>
+        <div class="log-time">${new Date(l.created_at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+    `).join('') : '<div style="color:var(--t3);font-size:12px">Noch keine Einträge</div>';
+
+    detContent.innerHTML = `
+      <div class="date-grid">
+        <div class="dbox ci"><div class="dbox-lbl">Parkdatum</div><div class="dbox-date">${b.date_in||'–'}</div><div class="dbox-time">${b.time_in||'–'}</div>
+          ${b.checked_in_at ? `<div class="dbox-status" style="color:var(--gr)">✓ Checked-in</div>` : `<button class="dbox-btn ci-btn" onclick="doCheckin(${b.id})">✓ Check-in</button>`}
+        </div>
+        <div class="dbox co"><div class="dbox-lbl">Rückgabe</div><div class="dbox-date">${b.date_out||'–'}</div><div class="dbox-time">${b.time_out||'–'}</div>
+          ${b.checked_out_at ? `<div class="dbox-status" style="color:var(--gr)">✓ Checked-out</div>` : `<button class="dbox-btn co-btn" onclick="doCheckout(${b.id})">⇥ Check-out</button>`}
+        </div>
+      </div>
+      ${b.flight_code ? `<div style="background:linear-gradient(135deg,#1C1C3A,#2A1A6E);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;border:1px solid rgba(124,58,237,0.25)"><svg style="width:16px;height:16px;fill:var(--ac)" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg><span style="color:white;font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace">${b.flight_code}</span></div>` : ''}
+      <div class="action-btns">
+        ${!b.paid && b.price > 0 ? `<button class="act-btn act-primary" onclick="doPay(${b.id},'Cash')">💳 Bezahlt (Cash)</button><button class="act-btn act-outline" onclick="doPay(${b.id},'PIN')">PIN</button>` : ''}
+        <button class="act-btn act-outline" onclick="toggleKey(${b.id},${b.key_handed_in?0:1})">${b.key_handed_in?'🔑 Schlüssel zurück':'🔑 Schlüssel abgeben'}</button>
+        ${b.status!=='noshow'?`<button class="act-btn act-outline" style="color:var(--t3);border-color:var(--t3)" onclick="doNoShow(${b.id})">No Show</button>`:''}
+      </div>
+      ${priceDisplay}
+      <div class="card"><div class="card-hd">Protokoll</div><div class="card-bd">${logHtml}</div></div>
+    `;
+  } catch (e) {
+    detContent.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="title">${e.message}</div></div>`;
+  }
+}
+
+// ─── Actions ────────────────────────────────────────────────────────
+async function doCheckin(id) {
+  try { await api('POST', `/bookings/${id}/checkin`, {}); toast('✓ Check-in erfolgreich', 'var(--gr)'); openDetail(id); } catch(e) { toast('⚠ '+e.message,'var(--rd)'); }
+}
+async function doCheckout(id) {
+  try { await api('POST', `/bookings/${id}/checkout`, {}); toast('✓ Check-out erfolgreich', 'var(--gr)'); openDetail(id); } catch(e) { toast('⚠ '+e.message,'var(--rd)'); }
+}
+async function doPay(id, method) {
+  try { await api('POST', `/bookings/${id}/pay`, { method }); toast('✓ Zahlung erfasst ('+method+')', 'var(--gr)'); openDetail(id); } catch(e) { toast('⚠ '+e.message,'var(--rd)'); }
+}
+async function doNoShow(id) {
+  try { await api('POST', `/bookings/${id}/noshow`, {}); toast('No-Show markiert', 'var(--t2)'); openDetail(id); } catch(e) { toast('⚠ '+e.message,'var(--rd)'); }
+}
+async function toggleKey(id, handedIn) {
+  try { await api('POST', `/bookings/${id}/key`, { handed_in: handedIn }); toast(handedIn?'🔑 Schlüssel abgegeben':'🔑 Schlüssellos', handedIn?'var(--gr)':'var(--rd)'); openDetail(id); } catch(e) { toast('⚠ '+e.message,'var(--rd)'); }
+}
+
+// ─── Scrape ─────────────────────────────────────────────────────────
+async function doScrape() {
+  toast('🔄 ParkingPro wird gescrapt...', 'var(--b5)');
+  try {
+    const res = await api('POST', '/scrape', { company: currentCompany });
+    toast(`✓ ${res.total||0} Buchungen (${res.created||0} neu)`, 'var(--gr)');
+    loadBookings();
+  } catch (e) { toast('⚠ Scrape: ' + e.message, 'var(--rd)'); }
+}
+
+// ─── Users ──────────────────────────────────────────────────────────
+async function loadUsers() {
+  const list = document.getElementById('userList');
+  try {
+    const users = await api('GET', '/users');
+    list.innerHTML = users.map(u => `
+      <div class="user-card">
+        <div class="user-avatar" style="background:${u.role==='admin'?'linear-gradient(135deg,var(--b5),var(--ac))':'linear-gradient(135deg,#6B7280,#4B5563)'}">${(u.display_name||u.username).charAt(0).toUpperCase()}</div>
+        <div><div class="user-name">${u.display_name}</div><div class="user-role">${u.role==='admin'?'Admin':'Mitarbeiter'} · @${u.username}</div></div>
+        <div class="user-actions">
+          ${u.active ? `<button class="top-btn" style="font-size:10px;padding:6px 10px" onclick="deleteUser(${u.id})">Deaktivieren</button>` : `<span style="font-size:10px;color:var(--t3)">Inaktiv</span>`}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) { list.innerHTML = `<div class="empty-state"><div class="title">${e.message}</div></div>`; }
+}
+
+function openAddUser() { document.getElementById('userModal').classList.add('open'); }
+function closeUserModal() { document.getElementById('userModal').classList.remove('open'); }
+
+async function createUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  const username = document.getElementById('newUserUsername').value.trim();
+  const password = document.getElementById('newUserPass').value;
+  const role = document.getElementById('newUserRole').value;
+  if (!name || !username || !password) return toast('Alle Felder ausfüllen', 'var(--rd)');
+  try {
+    await api('POST', '/users', { display_name: name, username, password, role });
+    toast('✓ Mitarbeiter erstellt', 'var(--gr)');
+    closeUserModal();
+    loadUsers();
+  } catch (e) { toast('⚠ ' + e.message, 'var(--rd)'); }
+}
+
+async function deleteUser(id) {
+  if (!confirm('Mitarbeiter deaktivieren?')) return;
+  try { await api('DELETE', '/users/' + id); toast('Deaktiviert', 'var(--t2)'); loadUsers(); } catch(e) { toast('⚠ '+e.message,'var(--rd)'); }
+}
+
+// ─── Navigation ─────────────────────────────────────────────────────
+function navTo(page) {
+  currentPage = page;
+  ['bookings', 'detail', 'users'].forEach(p => {
+    const el = document.getElementById('page-' + p);
+    if (el) el.style.display = p === page ? '' : 'none';
+  });
+  // Sidebar highlight
+  document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('on', l.dataset.nav === page));
+  document.querySelectorAll('.mob-tab').forEach(t => t.classList.toggle('on', t.dataset.mob === page));
+  // Load data
+  if (page === 'bookings') loadBookings();
+  if (page === 'users') loadUsers();
+}
+
+function toggleMobileMenu() {
+  // Simple: just toggle sidebar visibility on mobile
+  const sb = document.getElementById('sidebar');
+  sb.style.display = sb.style.display === 'flex' ? 'none' : 'flex';
+  sb.style.position = 'fixed';
+  sb.style.zIndex = '200';
+  sb.style.height = '100vh';
+}
+
+// ─── Toast ──────────────────────────────────────────────────────────
+function toast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color || 'var(--b5)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── Init ───────────────────────────────────────────────────────────
+document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
+
+if (token && user) { showApp(); } else { document.getElementById('loginPage').style.display = ''; }
+</script>
+</body>
+</html>
