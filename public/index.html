@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Park King OS</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Inter,system-ui,sans-serif;background:#060B20;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#0C1235;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:48px;max-width:440px;text-align:center}
+  .logo{width:64px;height:64px;background:linear-gradient(135deg,#3B68F0,#00D4FF);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:28px;font-weight:900}
+  h1{font-size:28px;font-weight:900;margin-bottom:8px;letter-spacing:-.5px}
+  h1 span{color:#00D4FF}
+  .sub{color:rgba(255,255,255,0.4);font-size:14px;margin-bottom:32px}
+  .status{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;margin-bottom:24px}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#10B981;margin-right:8px;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .status-text{color:#10B981;font-size:14px;font-weight:700}
+  .info{color:rgba(255,255,255,0.3);font-size:12px;line-height:1.8}
+  .info code{background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#00D4FF}
+  .btn{display:inline-block;margin-top:24px;padding:12px 32px;background:linear-gradient(135deg,#3B68F0,#00D4FF);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .1s}
+  .btn:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🅿️</div>
+  <h1>Park King <span>OS</span></h1>
+  <p class="sub">Parkplatz-Management System · Phase 1 Backend</p>
+  <div class="status">
+    <span class="status-dot"></span>
+    <span class="status-text">Backend läuft</span>
+  </div>
+  <div class="info">
+    API: <code>GET /api/health</code><br>
+    Login: <code>POST /api/auth/login</code><br>
+    Buchungen: <code>GET /api/bookings</code><br>
+    Scrape: <code>POST /api/scrape</code><br>
+    Stats: <code>GET /api/stats</code><br><br>
+    Default Admin: <code>admin</code> / <code>admin123</code>
+  </div>
+  <a href="/api/health" class="btn">API Health Check</a>
+</div>
+</body>
+</html>
