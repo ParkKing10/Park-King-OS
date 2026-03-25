@@ -109,7 +109,8 @@
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
     <div class="login-logo"><div class="login-logo-icon">P</div><h1>Label Print Tool<span>by Park King</span></h1></div>
-    <div class="form-group"><label class="form-label">Team-Passwort</label><input type="password" id="loginPass" class="form-input" placeholder="Passwort eingeben" autofocus></div>
+    <div class="form-group"><label class="form-label">Benutzername</label><input type="text" id="loginUser" class="form-input" placeholder="Benutzername" autocomplete="username" autofocus></div>
+    <div class="form-group"><label class="form-label">Passwort</label><input type="password" id="loginPass" class="form-input" placeholder="Passwort" autocomplete="current-password"></div>
     <button class="btn btn-accent" onclick="doLogin()">EINLOGGEN</button>
     <div id="loginError" class="error-msg" style="display:none"></div>
   </div>
@@ -163,15 +164,19 @@ let companyName = '';
 
 if (authToken) { showApp(); selectCompany(currentCompany); } else { document.getElementById('loginScreen').style.display='flex'; }
 document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
+
+function authHeaders() { return {'Authorization':'Bearer '+authToken,'Content-Type':'application/json'}; }
 
 async function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value.trim();
-  if (!pass) return;
+  if (!user || !pass) return;
   try {
-    const res = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pass})});
+    const res = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
     const data = await res.json();
-    if (data.success) { authToken=data.token; localStorage.setItem('pp_token',authToken); showApp(); selectCompany(currentCompany); }
-    else showLoginError('Falsches Passwort');
+    if (data.token) { authToken=data.token; localStorage.setItem('pp_token',authToken); showApp(); selectCompany(currentCompany); }
+    else showLoginError(data.error||'Ungültige Zugangsdaten');
   } catch(e) { showLoginError('Verbindungsfehler'); }
 }
 function doLogout() { authToken=''; localStorage.removeItem('pp_token'); document.getElementById('app').classList.remove('active'); document.getElementById('loginScreen').style.display='flex'; }
@@ -190,30 +195,31 @@ async function loadBookings(forceRefresh) {
   const list=document.getElementById('bookingList'), loading=document.getElementById('loadingState'), err=document.getElementById('errorState');
   list.innerHTML=''; loading.style.display='flex'; err.style.display='none'; document.getElementById('searchInput').value='';
   document.getElementById('statusBar').innerHTML='';
-  const refreshParam = forceRefresh ? '&refresh=true' : '';
+  if (forceRefresh) {
+    try { await fetch('/api/scrape',{method:'POST',headers:authHeaders(),body:JSON.stringify({company:currentCompany})}); } catch(e) {}
+  }
   try {
-    const res = await fetch('/api/bookings?company='+currentCompany+refreshParam, {headers:{'X-Auth-Token':authToken}});
+    const today = new Date().toISOString().split('T')[0];
+    const res = await fetch('/api/bookings?company='+currentCompany+'&date='+today+'&type=in', {headers:authHeaders()});
     if (res.status===401) { doLogout(); return; }
     const data = await res.json();
-    if (data.error) throw new Error(data.detail||data.error);
-    allBookings = (data.bookings||[]).filter(b => b.type==='checkin');
-    companyName = data.company || '';
+    if (data.error) throw new Error(data.error);
+    allBookings = data.bookings||[];
+    companyName = currentCompany==='parkking'?'Park King':'PSF/MSF';
     loading.style.display='none';
-    const cacheInfo = data.fromCache ? '⚡ Cache' : '🔄 Frisch';
     document.getElementById('statusBar').innerHTML = `
       <div class="status-chip chip-company">${companyName}</div>
-      <div class="status-chip chip-blue">${data.date||'Heute'}</div>
-      <div class="status-chip chip-green">▶ ${allBookings.length} Check-Ins</div>
-      <div class="status-chip" style="background:rgba(255,255,255,0.05);color:var(--text3)">${cacheInfo}</div>`;
+      <div class="status-chip chip-blue">${data.date||today}</div>
+      <div class="status-chip chip-green">▶ ${allBookings.length} Check-Ins</div>`;
     if (!allBookings.length) { err.textContent='Keine Check-In Buchungen für heute.'; err.style.display='block'; return; }
     renderBookings(allBookings);
-    showToast(allBookings.length+' Check-Ins '+(data.fromCache?'(Cache)':'geladen')+' ✓');
+    showToast(allBookings.length+' Check-Ins geladen ✓');
   } catch(e) { loading.style.display='none'; err.innerHTML=`<div style="margin-bottom:8px">⚠️ ${e.message}</div><button class="btn btn-accent" onclick="loadBookings(true)" style="display:inline-block;width:auto;padding:10px 20px;font-size:13px">Nochmal</button>`; err.style.display='block'; }
 }
 
 function filterBookings() {
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const filtered = q ? allBookings.filter(b => (b.kennzeichen||'').toLowerCase().includes(q)||(b.name||'').toLowerCase().includes(q)) : allBookings;
+  const filtered = q ? allBookings.filter(b => (b.plate||'').toLowerCase().includes(q)||(b.name||'').toLowerCase().includes(q)) : allBookings;
   renderBookings(filtered);
   const c=document.querySelector('.chip-green'); if(c) c.textContent='▶ '+filtered.length+' Check-Ins';
 }
@@ -222,37 +228,30 @@ function renderBookings(list) {
   const el=document.getElementById('bookingList');
   if(!list.length){el.innerHTML='<div class="empty">Keine Treffer.</div>';return;}
   el.innerHTML=list.map((b,i)=>`<div class="booking-card" onclick="openEdit(${allBookings.indexOf(b)})" style="animation-delay:${Math.min(i,15)*0.03+0.05}s">
-    <div class="booking-plate">${b.kennzeichen||'—'}</div>
+    <div class="booking-plate">${b.plate||'—'}</div>
     <div class="booking-name">${b.name||'—'}</div>
     <div class="booking-details">
-      ${b.rueckgabeVoll?`<div class="booking-detail">↩ <strong>${b.rueckgabeVoll}</strong></div>`:(b.rueckgabe?`<div class="booking-detail">↩ <strong>${b.rueckgabe}</strong></div>`:'')}
-      ${b.fahrzeug?`<div class="booking-detail">🚗 ${b.fahrzeug}</div>`:''}
-      ${b.zeit?`<div class="booking-detail">⏰ ${b.zeit}</div>`:''}
+      ${b.date_out?`<div class="booking-detail">↩ <strong>${b.date_out}${b.time_out?' '+b.time_out:''}</strong></div>`:''}
+      ${b.car?`<div class="booking-detail">🚗 ${b.car}</div>`:''}
+      ${b.time_in?`<div class="booking-detail">⏰ ${b.time_in}</div>`:''}
     </div></div>`).join('');
 }
 
 function openEdit(idx) {
   currentBooking={...allBookings[idx],_idx:idx};
   document.getElementById('editName').value=currentBooking.name||'';
-  document.getElementById('editPlate').value=currentBooking.kennzeichen||'';
-  document.getElementById('editCar').value=currentBooking.fahrzeug||'';
-  // Use full departure datetime if available
-  document.getElementById('editReturnDate').value=currentBooking.rueckgabeDatum||currentBooking.rueckgabe||'';
-  document.getElementById('editReturnTime').value=currentBooking.rueckgabeZeit||'';
+  document.getElementById('editPlate').value=currentBooking.plate||'';
+  document.getElementById('editCar').value=currentBooking.car||'';
+  document.getElementById('editReturnDate').value=currentBooking.date_out||'';
+  document.getElementById('editReturnTime').value=currentBooking.time_out||'';
   document.getElementById('editModal').classList.add('active');
   renderLabel();
 }
 
-function closeModal() {
-  if(currentBooking){
-    const idx=currentBooking._idx;
-    allBookings[idx].kennzeichen=document.getElementById('editPlate').value.trim().toUpperCase();
-    allBookings[idx].name=document.getElementById('editName').value.trim();
-    allBookings[idx].fahrzeug=document.getElementById('editCar').value.trim();
-    allBookings[idx].rueckgabeDatum=document.getElementById('editReturnDate').value.trim();
-    allBookings[idx].rueckgabeZeit=document.getElementById('editReturnTime').value.trim();
-    allBookings[idx].rueckgabeVoll=(allBookings[idx].rueckgabeDatum+' '+allBookings[idx].rueckgabeZeit).trim();
-    filterBookings();
+async function closeModal() {
+  if(currentBooking && currentBooking.id){
+    const updates={plate:document.getElementById('editPlate').value.trim().toUpperCase(),name:document.getElementById('editName').value.trim(),car:document.getElementById('editCar').value.trim(),date_out:document.getElementById('editReturnDate').value.trim(),time_out:document.getElementById('editReturnTime').value.trim()};
+    try { await fetch('/api/bookings/'+currentBooking.id,{method:'PUT',headers:authHeaders(),body:JSON.stringify(updates)}); Object.assign(allBookings[currentBooking._idx],updates); filterBookings(); } catch(e) {}
   }
   document.getElementById('editModal').classList.remove('active');
 }
@@ -271,38 +270,32 @@ function renderLabel() {
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='top';
 
-  // Name (top)
   let fsName=32;
   ctx.font=`500 ${fsName}px "Helvetica Neue",Arial,sans-serif`;
   while(ctx.measureText(name||'—').width>W-30&&fsName>18){fsName-=2;ctx.font=`500 ${fsName}px "Helvetica Neue",Arial,sans-serif`;}
   ctx.fillText(name||'—',W/2,8);
 
-  // Rückgabe Datum (BIG)
   let fs=82;
   ctx.font=`900 ${fs}px "Helvetica Neue",Arial,sans-serif`;
   while(ctx.measureText(retDate||'—').width>W-20&&fs>40){fs-=4;ctx.font=`900 ${fs}px "Helvetica Neue",Arial,sans-serif`;}
   ctx.fillText(retDate||'—',W/2,8+fsName+4);
 
-  // Rückgabe Uhrzeit (BIG)
   let fs2=74;
   ctx.font=`900 ${fs2}px "Helvetica Neue",Arial,sans-serif`;
   while(ctx.measureText(retTime||'—').width>W-20&&fs2>40){fs2-=4;ctx.font=`900 ${fs2}px "Helvetica Neue",Arial,sans-serif`;}
   ctx.fillText(retTime||'—',W/2,8+fsName+4+fs+2);
 
-  // Fahrzeug + Kennzeichen (bottom)
   const bottomText=[car,plate].filter(Boolean).join('  ');
   let fs3=30;
   ctx.font=`700 ${fs3}px "Helvetica Neue",Arial,sans-serif`;
   while(ctx.measureText(bottomText||'—').width>W-20&&fs3>16){fs3-=2;ctx.font=`700 ${fs3}px "Helvetica Neue",Arial,sans-serif`;}
   ctx.fillText(bottomText||'—',W/2,H-fs3-6);
-
   ctx.textAlign='left';
 }
 
 function printLabel() {
   const canvas=document.getElementById('labelCanvas');
   const dataUrl=canvas.toDataURL('image/png');
-
   const printWin=window.open('','_blank','width=600,height=400');
   printWin.document.write(`<!DOCTYPE html><html><head><title>Label</title>
 <style>
