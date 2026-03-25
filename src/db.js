@@ -199,6 +199,35 @@ function initSchema() {
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- ═══ DAMAGES (Schadensprotokoll) ═══
+    CREATE TABLE IF NOT EXISTS damages (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      damage_number   TEXT NOT NULL UNIQUE,           -- e.g. 'DMG-2026-0001'
+      first_name      TEXT NOT NULL,
+      last_name       TEXT NOT NULL,
+      plate           TEXT NOT NULL,
+      car_brand       TEXT,
+      car_color       TEXT,
+      incident_time   TEXT,                           -- HH:MM
+      incident_date   TEXT NOT NULL,                  -- YYYY-MM-DD
+      description     TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'open',   -- 'open' | 'in_progress' | 'closed'
+      created_by      INTEGER REFERENCES users(id),
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ═══ DAMAGE PHOTOS ═══
+    CREATE TABLE IF NOT EXISTS damage_photos (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      damage_id   INTEGER NOT NULL REFERENCES damages(id),
+      filename    TEXT NOT NULL,
+      filepath    TEXT NOT NULL,
+      label       TEXT,                              -- 'front' | 'back' | 'left' | 'right' | 'detail' | 'other'
+      uploaded_by INTEGER REFERENCES users(id),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- ═══ INDEXES ═══
     CREATE INDEX IF NOT EXISTS idx_bookings_company ON bookings(company_id);
     CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(scraped_date);
@@ -209,6 +238,9 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_log_booking ON booking_log(booking_id);
     CREATE INDEX IF NOT EXISTS idx_shifts_user ON shifts(user_id);
     CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
+    CREATE INDEX IF NOT EXISTS idx_damages_plate ON damages(plate);
+    CREATE INDEX IF NOT EXISTS idx_damages_number ON damages(damage_number);
+    CREATE INDEX IF NOT EXISTS idx_damage_photos_damage ON damage_photos(damage_id);
   `);
 
   console.log('[DB] Schema initialized');
@@ -266,6 +298,21 @@ function seedDefaults() {
     insertTpl.run('Spät', '15:00', '00:00', '#f59e0b');
     insertTpl.run('Lang', '03:00', '00:00', '#CC6CE7');
     console.log('[DB] Default shift templates created');
+  }
+
+  // Example damage
+  const existingDamage = d.prepare('SELECT COUNT(*) as c FROM damages').get();
+  if (existingDamage.c === 0) {
+    d.prepare(`INSERT INTO damages (damage_number, first_name, last_name, plate, car_brand, car_color, incident_time, incident_date, description, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      'DMG-2026-0001', 'Max', 'Mustermann', 'HH-AB 1234', 'BMW', 'Schwarz', '14:30', '2026-03-20',
+      'Beim Einparken wurde die Fahrertür des Kundenfahrzeugs gegen einen Poller gedrückt. Deutliche Delle und Lackschaden an der linken Seite. Kunde war beim Vorfall nicht anwesend, Schaden wurde beim Fahrzeug-Check festgestellt.',
+      'open'
+    );
+    // Add example photo (external URL as reference)
+    d.prepare('INSERT INTO damage_photos (damage_id, filename, filepath, label) VALUES (?, ?, ?, ?)')
+      .run(1, 'beispiel-schaden.jpg', 'https://kfzgutachterhamburg.com/wp-content/uploads/2020/01/kfz-schaden-auszahlen-lassen.jpg', 'left');
+    console.log('[DB] Example damage created');
   }
 }
 

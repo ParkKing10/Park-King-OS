@@ -3,11 +3,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { getDb, addLog } = require('./db');
 const { login, requireAuth, requireAdmin, createUser, updateUser, listUsers } = require('./auth');
 const { scrapeCompany, autoScrapeAll } = require('./scraper');
 
 const router = express.Router();
+
+// ─── Photo upload config ────────────────────────────────────────────────
+const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `dmg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) cb(null, true);
+  else cb(new Error('Nur Bilder erlaubt'));
+}});
 
 // ─── AUTH ────────────────────────────────────────────────────────────────
 
@@ -599,6 +618,103 @@ function calcShiftHours(startTime, endTime, breakMin) {
   const totalMinutes = endMinutes - startMinutes - (breakMin || 0);
   return Math.max(0, totalMinutes / 60);
 }
+
+// ─── DAMAGES (Schadensprotokoll) ────────────────────────────────────────
+
+// Generate next damage number
+function nextDamageNumber() {
+  const d = getDb();
+  const year = new Date().getFullYear();
+  const last = d.prepare("SELECT damage_number FROM damages WHERE damage_number LIKE ? ORDER BY id DESC LIMIT 1")
+    .get(`DMG-${year}-%`);
+  if (last) {
+    const num = parseInt(last.damage_number.split('-')[2]) + 1;
+    return `DMG-${year}-${String(num).padStart(4, '0')}`;
+  }
+  return `DMG-${year}-0001`;
+}
+
+// List all damages
+router.get('/damages', requireAuth, (req, res) => {
+  const d = getDb();
+  const { status, search } = req.query;
+  let sql = `SELECT dm.*, u.display_name as created_by_name,
+    (SELECT COUNT(*) FROM damage_photos dp WHERE dp.damage_id = dm.id) as photo_count
+    FROM damages dm LEFT JOIN users u ON dm.created_by = u.id WHERE 1=1`;
+  const params = [];
+  if (status) { sql += ' AND dm.status = ?'; params.push(status); }
+  if (search) {
+    sql += ' AND (dm.plate LIKE ? OR dm.first_name LIKE ? OR dm.last_name LIKE ? OR dm.damage_number LIKE ?)';
+    const s = `%${search}%`; params.push(s, s, s, s);
+  }
+  sql += ' ORDER BY dm.created_at DESC';
+  res.json(d.prepare(sql).all(...params));
+});
+
+// Get single damage with photos
+router.get('/damages/:id', requireAuth, (req, res) => {
+  const d = getDb();
+  const damage = d.prepare(`SELECT dm.*, u.display_name as created_by_name
+    FROM damages dm LEFT JOIN users u ON dm.created_by = u.id WHERE dm.id = ?`).get(parseInt(req.params.id));
+  if (!damage) return res.status(404).json({ error: 'Schaden nicht gefunden' });
+  const photos = d.prepare('SELECT * FROM damage_photos WHERE damage_id = ? ORDER BY created_at ASC').all(damage.id);
+  res.json({ damage, photos });
+});
+
+// Create damage
+router.post('/damages', requireAuth, (req, res) => {
+  const d = getDb();
+  const { first_name, last_name, plate, car_brand, car_color, incident_time, description } = req.body;
+  if (!first_name || !last_name || !plate || !description) {
+    return res.status(400).json({ error: 'Vorname, Nachname, Kennzeichen und Beschreibung erforderlich' });
+  }
+  const damage_number = nextDamageNumber();
+  const incident_date = new Date().toISOString().split('T')[0];
+  const result = d.prepare(`INSERT INTO damages (damage_number, first_name, last_name, plate, car_brand, car_color, incident_time, incident_date, description, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    damage_number, first_name, last_name, plate.toUpperCase(),
+    car_brand || null, car_color || null, incident_time || null, incident_date, description, req.user.id
+  );
+  res.json({ id: result.lastInsertRowid, damage_number, message: 'Schaden protokolliert' });
+});
+
+// Update damage status
+router.put('/damages/:id', requireAuth, (req, res) => {
+  const d = getDb();
+  const { status, description } = req.body;
+  const fields = []; const values = [];
+  if (status) { fields.push('status = ?'); values.push(status); }
+  if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+  if (!fields.length) return res.status(400).json({ error: 'Keine Änderungen' });
+  fields.push("updated_at = datetime('now')");
+  values.push(parseInt(req.params.id));
+  d.prepare(`UPDATE damages SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  res.json({ message: 'Schaden aktualisiert' });
+});
+
+// Upload photos to damage
+router.post('/damages/:id/photos', requireAuth, upload.array('photos', 10), (req, res) => {
+  const d = getDb();
+  const damageId = parseInt(req.params.id);
+  const damage = d.prepare('SELECT id FROM damages WHERE id = ?').get(damageId);
+  if (!damage) return res.status(404).json({ error: 'Schaden nicht gefunden' });
+
+  const label = req.body.label || 'other';
+  const photos = [];
+  for (const file of (req.files || [])) {
+    const result = d.prepare('INSERT INTO damage_photos (damage_id, filename, filepath, label, uploaded_by) VALUES (?, ?, ?, ?, ?)')
+      .run(damageId, file.originalname, `/uploads/${file.filename}`, label, req.user.id);
+    photos.push({ id: result.lastInsertRowid, filename: file.originalname, filepath: `/uploads/${file.filename}` });
+  }
+  res.json({ message: `${photos.length} Foto(s) hochgeladen`, photos });
+});
+
+// Serve uploaded photos
+router.get('/uploads/:filename', (req, res) => {
+  const filePath = path.join(UPLOAD_DIR, req.params.filename);
+  if (fs.existsSync(filePath)) res.sendFile(filePath);
+  else res.status(404).json({ error: 'Datei nicht gefunden' });
+});
 
 // ─── HEALTH ─────────────────────────────────────────────────────────────
 
