@@ -151,6 +151,28 @@ function initSchema() {
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- ═══ TASKS (daily recurring task templates) ═══
+    CREATE TABLE IF NOT EXISTS tasks (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      title       TEXT NOT NULL,
+      description TEXT,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      active      INTEGER NOT NULL DEFAULT 1,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ═══ TASK COMPLETIONS (daily tracking) ═══
+    CREATE TABLE IF NOT EXISTS task_completions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id     INTEGER NOT NULL REFERENCES tasks(id),
+      date        TEXT NOT NULL,                    -- YYYY-MM-DD
+      completed   INTEGER NOT NULL DEFAULT 1,
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      completed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(task_id, date)
+    );
+
     -- ═══ INDEXES ═══
     CREATE INDEX IF NOT EXISTS idx_bookings_company ON bookings(company_id);
     CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(scraped_date);
@@ -172,10 +194,10 @@ function seedDefaults() {
   // Default admin user (password: admin123 — change in production!)
   const existingAdmin = d.prepare('SELECT id FROM users WHERE role = ?').get('admin');
   if (!existingAdmin) {
-    const hash = bcrypt.hashSync('admin123', 10);
+    const hash = bcrypt.hashSync('Berlin123!', 10);
     d.prepare('INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)')
       .run('admin', hash, 'Administrator', 'admin');
-    console.log('[DB] Default admin created (admin / admin123)');
+    console.log('[DB] Default admin created (admin / Berlin123!)');
   }
 
   // Default companies from env vars

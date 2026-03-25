@@ -354,6 +354,91 @@ router.put('/settings', requireAuth, requireAdmin, (req, res) => {
   res.json({ message: 'Einstellungen gespeichert' });
 });
 
+// ─── TASKS (daily recurring) ────────────────────────────────────────────
+
+// Get all tasks with today's completion status
+router.get('/tasks', requireAuth, (req, res) => {
+  const d = getDb();
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+  const tasks = d.prepare(`
+    SELECT t.*, 
+      tc.user_id as completed_by_id,
+      tc.completed_at,
+      u.display_name as completed_by_name
+    FROM tasks t
+    LEFT JOIN task_completions tc ON t.id = tc.task_id AND tc.date = ?
+    LEFT JOIN users u ON tc.user_id = u.id
+    WHERE t.active = 1
+    ORDER BY t.sort_order ASC, t.id ASC
+  `).all(date);
+  res.json({ tasks, date });
+});
+
+// Create task (admin only)
+router.post('/tasks', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const { title, description } = req.body;
+  if (!title) return res.status(400).json({ error: 'Titel erforderlich' });
+  const maxOrder = d.prepare('SELECT MAX(sort_order) as m FROM tasks WHERE active = 1').get();
+  const result = d.prepare('INSERT INTO tasks (title, description, sort_order, created_by) VALUES (?, ?, ?, ?)')
+    .run(title, description || null, (maxOrder?.m || 0) + 1, req.user.id);
+  res.json({ id: result.lastInsertRowid, message: 'Aufgabe erstellt' });
+});
+
+// Update task (admin only)
+router.put('/tasks/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const { title, description, sort_order } = req.body;
+  const fields = [];
+  const values = [];
+  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+  if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+  if (sort_order !== undefined) { fields.push('sort_order = ?'); values.push(sort_order); }
+  if (!fields.length) return res.status(400).json({ error: 'Keine Änderungen' });
+  values.push(parseInt(req.params.id));
+  d.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  res.json({ message: 'Aufgabe aktualisiert' });
+});
+
+// Delete task (admin only) — soft delete
+router.delete('/tasks/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  d.prepare('UPDATE tasks SET active = 0 WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ message: 'Aufgabe entfernt' });
+});
+
+// Toggle task completion for today
+router.post('/tasks/:id/toggle', requireAuth, (req, res) => {
+  const d = getDb();
+  const taskId = parseInt(req.params.id);
+  const date = new Date().toISOString().split('T')[0];
+  
+  const existing = d.prepare('SELECT id FROM task_completions WHERE task_id = ? AND date = ?').get(taskId, date);
+  if (existing) {
+    d.prepare('DELETE FROM task_completions WHERE id = ?').run(existing.id);
+    res.json({ completed: false, message: 'Aufgabe als offen markiert' });
+  } else {
+    d.prepare('INSERT INTO task_completions (task_id, date, user_id) VALUES (?, ?, ?)')
+      .run(taskId, date, req.user.id);
+    res.json({ completed: true, message: 'Aufgabe erledigt ✓' });
+  }
+});
+
+// Task completion history (admin)
+router.get('/tasks/history', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const days = parseInt(req.query.days) || 7;
+  const history = d.prepare(`
+    SELECT tc.*, t.title as task_title, u.display_name as user_name
+    FROM task_completions tc
+    JOIN tasks t ON tc.task_id = t.id
+    JOIN users u ON tc.user_id = u.id
+    ORDER BY tc.completed_at DESC
+    LIMIT ?
+  `).all(days * 20);
+  res.json(history);
+});
+
 // ─── HEALTH ─────────────────────────────────────────────────────────────
 
 router.get('/health', (req, res) => {
