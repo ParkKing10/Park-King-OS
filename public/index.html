@@ -640,11 +640,13 @@ async function loadDamages(){
   document.getElementById('dmgSearch').closest('.dmg-search').style.display='';
   document.querySelector('.dmg-top').style.display='';
   try{
-    const r=await fetch('/api/damages',{headers:ah()});if(r.status===401){doLogout();return;}
-    allDamages=await r.json();
+    const r=await fetch('/api/damages',{headers:ah()});
+    if(r.status===401){doLogout();return;}
+    const data=await r.json();
     document.getElementById('dmgLoading').style.display='none';
-    renderDamages(allDamages);
-  }catch(e){document.getElementById('dmgLoading').style.display='none';document.getElementById('dmgList').innerHTML='<div class="task-empty">⚠️ Fehler</div>';}
+    if(r.ok&&Array.isArray(data)){allDamages=data;renderDamages(allDamages);}
+    else{allDamages=[];document.getElementById('dmgList').innerHTML=`<div class="task-empty">⚠️ ${data.error||'Fehler beim Laden'}<br><small style="color:var(--text3)">Server neustarten falls Tabelle fehlt</small></div>`;}
+  }catch(e){document.getElementById('dmgLoading').style.display='none';document.getElementById('dmgList').innerHTML=`<div class="task-empty">⚠️ Verbindungsfehler<br><small style="color:var(--text3)">${e.message}</small></div>`;}
 }
 
 function filterDamages(){
