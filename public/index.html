@@ -439,33 +439,44 @@ function rl(idx){const name=(document.getElementById('en-'+idx)?.value||'').trim
 const W=673,H=378,cv=document.getElementById('cv-'+idx);if(!cv)return;
 cv.width=W;cv.height=H;cv.style.width='100%';cv.style.maxWidth='300px';cv.style.height='auto';
 const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';c.textAlign='center';
-// Measure all elements first
-let f1=22;c.font=`600 ${f1}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(name||'—').width>W-10&&f1>10){f1-=2;c.font=`600 ${f1}px "Helvetica Neue",Arial,sans-serif`;}
-let fp=32;c.font=`900 ${fp}px "JetBrains Mono",monospace`;while(c.measureText(plate||'—').width>W-10&&fp>16){fp-=2;c.font=`900 ${fp}px "JetBrains Mono",monospace`;}
-let f2=100;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retDate||'—').width>W-8&&f2>40){f2-=4;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;}
-let f3=80;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retTime||'—').width>W-8&&f3>30){f3-=4;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;}
-let fs=spot?22:0;if(spot){c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(spot).width>W-10&&fs>12){fs-=2;c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;}}
-let fb=20;const botLine=cn+(car?' · '+car:'');c.font=`700 ${fb}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(botLine).width>W-10&&fb>10){fb-=2;c.font=`700 ${fb}px "Helvetica Neue",Arial,sans-serif`;}
+// Measure all elements first — bigger sizes for name, plate, company
+let f1=32;c.font=`700 ${f1}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(name||'—').width>W-10&&f1>14){f1-=2;c.font=`700 ${f1}px "Helvetica Neue",Arial,sans-serif`;}
+let fp=44;c.font=`900 ${fp}px "JetBrains Mono",monospace`;while(c.measureText(plate||'—').width>W-10&&fp>20){fp-=2;c.font=`900 ${fp}px "JetBrains Mono",monospace`;}
+let f2=96;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retDate||'—').width>W-8&&f2>40){f2-=4;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;}
+let f3=76;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retTime||'—').width>W-8&&f3>30){f3-=4;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;}
+let fs=spot?24:0;if(spot){c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(spot).width>W-10&&fs>12){fs-=2;c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;}}
+let fb=28;const botLine=cn+(car?' · '+car:'');c.font=`800 ${fb}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(botLine).width>W-10&&fb>12){fb-=2;c.font=`800 ${fb}px "Helvetica Neue",Arial,sans-serif`;}
 // Calculate total content height with tight gaps
 const gap=2;const totalH=f1+gap+fp+gap+f2+gap+f3+(spot?gap+fs:0)+gap+fb;
 let y=Math.max(4,Math.floor((H-totalH)/2));
 // Draw vertically centered
 c.textBaseline='top';
-c.font=`600 ${f1}px "Helvetica Neue",Arial,sans-serif`;c.fillText(name||'—',W/2,y);y+=f1+gap;
+c.font=`700 ${f1}px "Helvetica Neue",Arial,sans-serif`;c.fillText(name||'—',W/2,y);y+=f1+gap;
 c.font=`900 ${fp}px "JetBrains Mono",monospace`;c.fillText(plate||'—',W/2,y);y+=fp+gap;
 c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;c.fillText(retDate||'—',W/2,y);y+=f2+gap;
 c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;c.fillText(retTime||'—',W/2,y);y+=f3+gap;
 if(spot){c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;c.fillText(spot,W/2,y);y+=fs+gap;}
-c.fillStyle='#333';c.font=`700 ${fb}px "Helvetica Neue",Arial,sans-serif`;c.fillText(botLine,W/2,y);
+c.fillStyle='#333';c.font=`800 ${fb}px "Helvetica Neue",Arial,sans-serif`;c.fillText(botLine,W/2,y);
 c.textAlign='left';}
 
 function gc(i){return document.getElementById('cv-'+i);}
 function printL(i){const cv=gc(i);if(!cv)return;markPrinted(i);filterBookings();
-// Rotate canvas 90° CW so the label prints in portrait mode (32mm wide × 57mm tall)
+// Rotate canvas 90° CW for portrait printing (32mm wide × 57mm tall)
 const rc=document.createElement('canvas');rc.width=cv.height;rc.height=cv.width;const rx=rc.getContext('2d');rx.translate(rc.width/2,rc.height/2);rx.rotate(Math.PI/2);rx.drawImage(cv,-cv.width/2,-cv.height/2);
-const d=rc.toDataURL('image/png');const w=window.open('','_blank','width=400,height=600');w.document.write(`<!DOCTYPE html><html><head><title>Label</title><meta name="viewport" content="width=device-width"><style>@page{size:32mm 57mm;margin:0}html,body{margin:0;padding:0;width:32mm;height:57mm;overflow:hidden}img{width:32mm;height:57mm;display:block}@media screen{html,body{width:auto;height:auto;overflow:visible;background:#f0f0f0;display:flex;justify-content:center;align-items:center;min-height:100vh}img{width:auto;height:80vh;max-height:500px;border:1px solid #ccc}}</style></head><body><img src="${d}" onload="setTimeout(()=>{window.print();},500);"></body></html>`);w.document.close();showToast('Label gedruckt ✓');}
-function downloadL(i){const cv=gc(i);if(!cv)return;const p=(document.getElementById('ep-'+i)?.value||'label').trim().toUpperCase().replace(/[\s\.]/g,'-');const a=document.createElement('a');a.download=`label-${p}-${Date.now()}.png`;a.href=cv.toDataURL('image/png');a.click();showToast('Gespeichert ✓');}
-async function shareL(i){const cv=gc(i);if(!cv)return;try{const b=await new Promise(r=>cv.toBlob(r,'image/png'));const f=new File([b],'label.png',{type:'image/png'});if(navigator.canShare?.({files:[f]})){await navigator.share({files:[f],title:'Label'});}else{downloadL(i);}}catch(e){downloadL(i);}}
+// Convert to blob and trigger download — user prints from Photos app (no Safari header/footer)
+rc.toBlob(blob=>{
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  const p=(document.getElementById('ep-'+i)?.value||'label').trim().toUpperCase().replace(/[\s\.]/g,'-');
+  a.download=`label-${p}.png`;a.href=url;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  showToast('Label gespeichert → aus Fotos drucken ✓');
+},'image/png');}
+function downloadL(i){const cv=gc(i);if(!cv)return;
+const rc=document.createElement('canvas');rc.width=cv.height;rc.height=cv.width;const rx=rc.getContext('2d');rx.translate(rc.width/2,rc.height/2);rx.rotate(Math.PI/2);rx.drawImage(cv,-cv.width/2,-cv.height/2);
+const p=(document.getElementById('ep-'+i)?.value||'label').trim().toUpperCase().replace(/[\s\.]/g,'-');const a=document.createElement('a');a.download=`label-${p}.png`;a.href=rc.toDataURL('image/png');a.click();showToast('Gespeichert ✓');}
+async function shareL(i){const cv=gc(i);if(!cv)return;try{
+const rc=document.createElement('canvas');rc.width=cv.height;rc.height=cv.width;const rx=rc.getContext('2d');rx.translate(rc.width/2,rc.height/2);rx.rotate(Math.PI/2);rx.drawImage(cv,-cv.width/2,-cv.height/2);
+const b=await new Promise(r=>rc.toBlob(r,'image/png'));const f=new File([b],'label.png',{type:'image/png'});if(navigator.canShare?.({files:[f]})){await navigator.share({files:[f],title:'Label'});}else{downloadL(i);}}catch(e){downloadL(i);}}
 
 // ═══ TASKS ═══
 async function loadTasks(){
