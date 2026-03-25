@@ -439,6 +439,167 @@ router.get('/tasks/history', requireAuth, requireAdmin, (req, res) => {
   res.json(history);
 });
 
+// ─── SHIFT TEMPLATES ────────────────────────────────────────────────────
+
+router.get('/shift-templates', requireAuth, (req, res) => {
+  const d = getDb();
+  const templates = d.prepare('SELECT * FROM shift_templates WHERE active = 1 ORDER BY start_time ASC').all();
+  res.json(templates);
+});
+
+router.post('/shift-templates', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const { name, start_time, end_time, color } = req.body;
+  if (!name || !start_time || !end_time) return res.status(400).json({ error: 'Name, Start und Ende erforderlich' });
+  const result = d.prepare('INSERT INTO shift_templates (name, start_time, end_time, color) VALUES (?, ?, ?, ?)')
+    .run(name, start_time, end_time, color || '#CC6CE7');
+  res.json({ id: result.lastInsertRowid, message: 'Vorlage erstellt' });
+});
+
+router.put('/shift-templates/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const { name, start_time, end_time, color } = req.body;
+  d.prepare('UPDATE shift_templates SET name = COALESCE(?, name), start_time = COALESCE(?, start_time), end_time = COALESCE(?, end_time), color = COALESCE(?, color) WHERE id = ?')
+    .run(name, start_time, end_time, color, parseInt(req.params.id));
+  res.json({ message: 'Vorlage aktualisiert' });
+});
+
+router.delete('/shift-templates/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  d.prepare('UPDATE shift_templates SET active = 0 WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ message: 'Vorlage entfernt' });
+});
+
+// ─── SHIFTS (schedule) ─────────────────────────────────────────────────
+
+// Get shifts for a week (date = any day in the week, returns Mon-Sun)
+router.get('/shifts', requireAuth, (req, res) => {
+  const d = getDb();
+  const dateParam = req.query.date || new Date().toISOString().split('T')[0];
+  const userId = req.query.user_id;
+
+  // Calculate week boundaries (Mon-Sun)
+  const refDate = new Date(dateParam + 'T12:00:00');
+  const dayOfWeek = refDate.getDay(); // 0=Sun, 1=Mon...
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(refDate);
+  monday.setDate(refDate.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const weekStart = monday.toISOString().split('T')[0];
+  const weekEnd = sunday.toISOString().split('T')[0];
+
+  let sql = `
+    SELECT s.*, u.display_name as user_name, u.username,
+      st.name as template_name, st.color as template_color
+    FROM shifts s
+    JOIN users u ON s.user_id = u.id
+    LEFT JOIN shift_templates st ON s.template_id = st.id
+    WHERE s.date >= ? AND s.date <= ?
+  `;
+  const params = [weekStart, weekEnd];
+
+  if (userId) {
+    sql += ' AND s.user_id = ?';
+    params.push(parseInt(userId));
+  }
+
+  sql += ' ORDER BY s.date ASC, s.start_time ASC';
+
+  const shifts = d.prepare(sql).all(...params);
+
+  // Calculate hours per user for this week
+  const hoursByUser = {};
+  for (const s of shifts) {
+    if (!hoursByUser[s.user_id]) hoursByUser[s.user_id] = { name: s.user_name, hours: 0, shifts: 0 };
+    const hours = calcShiftHours(s.start_time, s.end_time, s.break_min);
+    hoursByUser[s.user_id].hours += hours;
+    hoursByUser[s.user_id].shifts += 1;
+  }
+
+  res.json({ shifts, weekStart, weekEnd, hoursByUser });
+});
+
+// Create shift (admin only)
+router.post('/shifts', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const { user_id, date, template_id, start_time, end_time, break_min, note } = req.body;
+  if (!user_id || !date || !start_time || !end_time) {
+    return res.status(400).json({ error: 'User, Datum, Start und Ende erforderlich' });
+  }
+  const result = d.prepare(`
+    INSERT INTO shifts (user_id, date, template_id, start_time, end_time, break_min, note, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(user_id, date, template_id || null, start_time, end_time, break_min || 0, note || null, req.user.id);
+  res.json({ id: result.lastInsertRowid, message: 'Schicht erstellt' });
+});
+
+// Update shift (admin only)
+router.put('/shifts/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const { user_id, date, template_id, start_time, end_time, break_min, note } = req.body;
+  d.prepare(`
+    UPDATE shifts SET
+      user_id = COALESCE(?, user_id),
+      date = COALESCE(?, date),
+      template_id = ?,
+      start_time = COALESCE(?, start_time),
+      end_time = COALESCE(?, end_time),
+      break_min = COALESCE(?, break_min),
+      note = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(user_id, date, template_id || null, start_time, end_time, break_min, note || null, parseInt(req.params.id));
+  res.json({ message: 'Schicht aktualisiert' });
+});
+
+// Delete shift (admin only)
+router.delete('/shifts/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  d.prepare('DELETE FROM shifts WHERE id = ?').run(parseInt(req.params.id));
+  res.json({ message: 'Schicht gelöscht' });
+});
+
+// Monthly hours summary
+router.get('/shifts/hours', requireAuth, (req, res) => {
+  const d = getDb();
+  const month = req.query.month || new Date().toISOString().slice(0, 7); // YYYY-MM
+  const monthStart = month + '-01';
+  const nextMonth = new Date(month + '-01T12:00:00');
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+  const monthEnd = nextMonth.toISOString().split('T')[0];
+
+  const shifts = d.prepare(`
+    SELECT s.user_id, u.display_name as user_name, s.start_time, s.end_time, s.break_min
+    FROM shifts s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.date >= ? AND s.date < ?
+    ORDER BY s.user_id
+  `).all(monthStart, monthEnd);
+
+  const summary = {};
+  for (const s of shifts) {
+    if (!summary[s.user_id]) summary[s.user_id] = { name: s.user_name, totalHours: 0, totalShifts: 0 };
+    summary[s.user_id].totalHours += calcShiftHours(s.start_time, s.end_time, s.break_min);
+    summary[s.user_id].totalShifts += 1;
+  }
+
+  res.json({ month, summary });
+});
+
+// Helper: calculate shift hours
+function calcShiftHours(startTime, endTime, breakMin) {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  let startMinutes = sh * 60 + sm;
+  let endMinutes = eh * 60 + em;
+  // Handle overnight (e.g. 15:00 - 00:00 or 22:00 - 06:00)
+  if (endMinutes <= startMinutes) endMinutes += 24 * 60;
+  const totalMinutes = endMinutes - startMinutes - (breakMin || 0);
+  return Math.max(0, totalMinutes / 60);
+}
+
 // ─── HEALTH ─────────────────────────────────────────────────────────────
 
 router.get('/health', (req, res) => {

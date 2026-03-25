@@ -13,8 +13,6 @@
   :root{--bg:#f7f7f8;--surface:#fff;--surface2:#f0f0f2;--border:#e4e4e7;--text:#18181b;--text2:#71717a;--text3:#a1a1aa;--accent:#CC6CE7;--accent-light:rgba(204,108,231,0.08);--green:#22c55e;--green-bg:rgba(34,197,94,0.12);--red:#ef4444;--red-bg:rgba(239,68,68,0.12);--orange:#f59e0b;--orange-bg:rgba(245,158,11,0.12);--blue:#3b82f6;--blue-bg:rgba(59,130,246,0.08);--r:12px;--shadow:0 1px 3px rgba(0,0,0,0.06)}
   html,body{height:100%}
   body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
-
-  /* ─── LOGIN ─── */
   .login-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#f8f0fc 0%,#f7f7f8 50%,#f0e8fc 100%)}
   .login-box{width:100%;max-width:380px;background:var(--surface);border-radius:20px;padding:36px 28px;box-shadow:0 8px 40px rgba(204,108,231,0.1)}
   .login-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;justify-content:center}
@@ -35,8 +33,6 @@
   .btn-sm{padding:10px 16px;font-size:13px}
   .btn-xs{padding:7px 12px;font-size:12px}
   .error-msg{color:var(--red);font-size:13px;margin-top:8px;text-align:center}
-
-  /* ─── APP SHELL ─── */
   .app{display:none;min-height:100dvh;flex-direction:column}.app.active{display:flex}
   .header{padding:12px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:100;box-shadow:var(--shadow)}
   .header-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:grid;place-items:center;font-size:15px;color:#fff;font-weight:800;font-family:'JetBrains Mono',monospace}
@@ -44,20 +40,14 @@
   .header-right{margin-left:auto;display:flex;gap:6px}
   .header-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;transition:all .2s}
   .header-btn:active{border-color:var(--accent);color:var(--accent)}
-
-  /* ─── BOTTOM NAV ─── */
   .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100;box-shadow:0 -2px 10px rgba(0,0,0,0.04);padding-bottom:env(safe-area-inset-bottom,0)}
   .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px 8px;cursor:pointer;color:var(--text3);font-size:10px;font-weight:600;transition:color .2s;border:none;background:none}
   .nav-item.active{color:var(--accent)}
   .nav-icon{font-size:20px;line-height:1}
   .nav-item.admin-only{display:none}
   body.is-admin .nav-item.admin-only{display:flex}
-
-  /* ─── TAB PAGES ─── */
   .tab-page{display:none;flex:1;padding:16px 20px;max-width:600px;margin:0 auto;width:100%;padding-bottom:80px}
   .tab-page.active{display:block}
-
-  /* ─── BOOKINGS TAB ─── */
   .company-select{display:flex;gap:8px;margin-bottom:16px}
   .company-btn{flex:1;padding:12px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s;box-shadow:var(--shadow)}
   .company-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
@@ -95,8 +85,6 @@
   .label-preview{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;justify-content:center;margin:10px 0}
   .label-preview canvas{display:block}
   .ed-btns{display:flex;gap:8px;flex-wrap:wrap}
-
-  /* ─── TASKS TAB ─── */
   .tasks-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
   .tasks-date{font-size:14px;font-weight:600;color:var(--text2)}
   .tasks-progress{display:flex;align-items:center;gap:10px;margin-bottom:20px}
@@ -115,8 +103,6 @@
   .task-desc{font-size:12px;color:var(--text3);margin-top:2px}
   .task-meta{font-size:11px;color:var(--green);font-weight:600;margin-top:4px}
   .task-empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:14px}
-
-  /* ─── ADMIN TAB ─── */
   .admin-section{margin-bottom:24px}
   .admin-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:8px}
   .admin-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:8px;box-shadow:var(--shadow)}
@@ -131,6 +117,36 @@
   .role-inactive{background:var(--surface2);color:var(--text3)}
   .admin-actions{display:flex;gap:6px;margin-top:8px}
 
+  /* ─── SCHEDULE TAB ─── */
+  .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .week-nav-btn{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;font-weight:700;color:var(--text2)}
+  .week-nav-btn:active{border-color:var(--accent);color:var(--accent)}
+  .week-label{font-size:14px;font-weight:700;text-align:center}
+  .week-label span{display:block;font-size:11px;font-weight:500;color:var(--text3)}
+  .schedule-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+  .day-row{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+  .day-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;font-weight:600;font-size:14px}
+  .day-header.today{background:var(--accent-light);color:var(--accent)}
+  .day-header .day-name{font-weight:700}
+  .day-header .day-date{font-size:12px;color:var(--text3);font-weight:500}
+  .day-header.today .day-date{color:var(--accent)}
+  .day-shifts{padding:0 14px 10px;display:flex;flex-direction:column;gap:6px}
+  .shift-pill{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:13px;position:relative}
+  .shift-pill .shift-time{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;min-width:95px}
+  .shift-pill .shift-user{font-weight:600;flex:1}
+  .shift-pill .shift-hours{font-size:11px;font-weight:700;opacity:0.7}
+  .shift-pill .shift-del{background:none;border:none;font-size:14px;cursor:pointer;padding:2px 6px;border-radius:4px;color:inherit;opacity:0.5}
+  .shift-pill .shift-del:hover{opacity:1;background:rgba(0,0,0,0.1)}
+  .day-empty{font-size:12px;color:var(--text3);padding:4px 0;font-style:italic}
+  .day-add{background:none;border:1.5px dashed var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text3);cursor:pointer;text-align:center;font-weight:600;width:100%}
+  .day-add:hover{border-color:var(--accent);color:var(--accent)}
+  .hours-summary{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
+  .hours-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:10px}
+  .hours-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+  .hours-row:last-child{border-bottom:none}
+  .hours-user{font-size:14px;font-weight:600}
+  .hours-val{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:14px;color:var(--accent)}
+
   /* ─── MISC ─── */
   .loading{display:flex;flex-direction:column;align-items:center;padding:60px 20px;gap:16px}
   .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
@@ -140,8 +156,6 @@
   .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1.5px solid var(--accent);color:var(--accent);padding:12px 24px;border-radius:50px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:1000;pointer-events:none;white-space:nowrap;box-shadow:0 8px 30px rgba(204,108,231,0.2)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-
-  /* ─── MODAL ─── */
   .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:flex-end;justify-content:center}
   .modal-overlay.open{display:flex}
   .modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:24px 20px 40px;max-height:80dvh;overflow-y:auto;animation:slideUp .3s ease}
@@ -152,7 +166,6 @@
 </head>
 <body>
 
-<!-- ═══ LOGIN ═══ -->
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
     <div class="login-logo"><div class="login-logo-icon">P</div><h1>Park King OS<span>v1</span></h1></div>
@@ -163,7 +176,6 @@
   </div>
 </div>
 
-<!-- ═══ APP ═══ -->
 <div class="app" id="app">
   <div class="header">
     <div class="header-icon">P</div><h1>Park King OS<span>v1</span></h1>
@@ -200,568 +212,260 @@
     <div id="taskList" class="task-list"></div>
   </div>
 
+  <!-- TAB: Dienstplan -->
+  <div class="tab-page" id="tabSchedule">
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="changeWeek(-1)">◂ Vor</button>
+      <div class="week-label" id="weekLabel">KW 13<span>24.03. – 30.03.2026</span></div>
+      <button class="week-nav-btn" onclick="changeWeek(1)">Weiter ▸</button>
+    </div>
+    <div id="scheduleLoading" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Dienstplan wird geladen...</div></div>
+    <div id="scheduleGrid" class="schedule-grid"></div>
+    <div class="hours-summary" id="hoursSummary" style="display:none">
+      <div class="hours-title">⏱ Stunden diese Woche</div>
+      <div id="hoursRows"></div>
+    </div>
+  </div>
+
   <!-- TAB: Admin -->
   <div class="tab-page" id="tabAdmin">
     <div style="font-size:18px;font-weight:700;margin-bottom:20px">⚙️ Administration</div>
-
-    <!-- User Management -->
     <div class="admin-section">
       <div class="admin-section-title">👤 Benutzer</div>
       <div id="userList"></div>
       <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addUser')">+ Neuer Benutzer</button>
     </div>
-
-    <!-- Task Management -->
     <div class="admin-section">
       <div class="admin-section-title">📋 Aufgaben verwalten</div>
       <div id="adminTaskList"></div>
       <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addTask')">+ Neue Aufgabe</button>
     </div>
+    <div class="admin-section">
+      <div class="admin-section-title">🕐 Schichtvorlagen</div>
+      <div id="adminTemplateList"></div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addTemplate')">+ Neue Vorlage</button>
+    </div>
+    <div class="admin-section">
+      <div class="admin-section-title">📊 Monatsstunden</div>
+      <div id="monthlyHours"></div>
+    </div>
   </div>
 
-  <!-- Bottom Navigation -->
   <nav class="bottom-nav">
-    <button class="nav-item active" onclick="switchTab('bookings')" id="navBookings">
-      <span class="nav-icon">🅿️</span>Buchungen
-    </button>
-    <button class="nav-item" onclick="switchTab('tasks')" id="navTasks">
-      <span class="nav-icon">📋</span>Aufgaben
-    </button>
-    <button class="nav-item admin-only" onclick="switchTab('admin')" id="navAdmin">
-      <span class="nav-icon">⚙️</span>Admin
-    </button>
+    <button class="nav-item active" onclick="switchTab('bookings')" id="navBookings"><span class="nav-icon">🅿️</span>Buchungen</button>
+    <button class="nav-item" onclick="switchTab('tasks')" id="navTasks"><span class="nav-icon">📋</span>Aufgaben</button>
+    <button class="nav-item" onclick="switchTab('schedule')" id="navSchedule"><span class="nav-icon">📅</span>Dienstplan</button>
+    <button class="nav-item admin-only" onclick="switchTab('admin')" id="navAdmin"><span class="nav-icon">⚙️</span>Admin</button>
   </nav>
 </div>
 
-<!-- ═══ MODALS ═══ -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalContent"></div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-//  Park King OS — Frontend v2
-// ═══════════════════════════════════════════════════════════════
+let authToken=localStorage.getItem('pp_token')||'',currentUser=null,currentCompany=localStorage.getItem('pp_company')||'parkking';
+let allBookings=[],allTasks=[],openEditorIdx=-1,printedIds=JSON.parse(localStorage.getItem('pp_printed')||'{}');
+let scheduleWeekOffset=0,shiftTemplates=[],allUsers=[];
 
-let authToken = localStorage.getItem('pp_token') || '';
-let currentUser = null;
-let currentCompany = localStorage.getItem('pp_company') || 'parkking';
-let allBookings = [];
-let allTasks = [];
-let openEditorIdx = -1;
-let printedIds = JSON.parse(localStorage.getItem('pp_printed') || '{}');
+if(authToken){initApp();}else{document.getElementById('loginScreen').style.display='flex';}
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
 
-// ─── Init ───
-if (authToken) { initApp(); } else { document.getElementById('loginScreen').style.display = 'flex'; }
+function ah(){return{'Authorization':'Bearer '+authToken,'Content-Type':'application/json'};}
 
-document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-document.getElementById('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPass').focus(); });
-
-// ─── Auth ───
-function ah() { return { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' }; }
-
-async function doLogin() {
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value.trim();
-  if (!u || !p) return;
-  try {
-    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
-    const d = await r.json();
-    if (d.token) {
-      authToken = d.token;
-      currentUser = d.user;
-      localStorage.setItem('pp_token', authToken);
-      initApp();
-    } else showErr(d.error || 'Ungültige Zugangsdaten');
-  } catch (e) { showErr('Verbindungsfehler'); }
+async function doLogin(){
+  const u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value.trim();
+  if(!u||!p)return;
+  try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});const d=await r.json();if(d.token){authToken=d.token;currentUser=d.user;localStorage.setItem('pp_token',authToken);initApp();}else showErr(d.error||'Ungültige Zugangsdaten');}catch(e){showErr('Verbindungsfehler');}
 }
 
-function doLogout() {
-  authToken = '';
-  currentUser = null;
-  localStorage.removeItem('pp_token');
-  document.getElementById('app').classList.remove('active');
-  document.body.classList.remove('is-admin');
-  document.getElementById('loginScreen').style.display = 'flex';
-}
+function doLogout(){authToken='';currentUser=null;localStorage.removeItem('pp_token');document.getElementById('app').classList.remove('active');document.body.classList.remove('is-admin');document.getElementById('loginScreen').style.display='flex';}
 
-async function initApp() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').classList.add('active');
-  try {
-    const r = await fetch('/api/auth/me', { headers: ah() });
-    if (r.status === 401) { doLogout(); return; }
-    const d = await r.json();
-    currentUser = d.user;
-    if (currentUser.role === 'admin') document.body.classList.add('is-admin');
-    else document.body.classList.remove('is-admin');
-  } catch (e) { doLogout(); return; }
+async function initApp(){
+  document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('active');
+  try{const r=await fetch('/api/auth/me',{headers:ah()});if(r.status===401){doLogout();return;}const d=await r.json();currentUser=d.user;if(currentUser.role==='admin')document.body.classList.add('is-admin');else document.body.classList.remove('is-admin');}catch(e){doLogout();return;}
+  // Preload templates and users for schedule
+  try{const[tR,uR]=await Promise.all([fetch('/api/shift-templates',{headers:ah()}),fetch('/api/users',{headers:ah()}).catch(()=>({json:async()=>[]}))]);shiftTemplates=await tR.json();try{allUsers=await uR.json();}catch(e){allUsers=[];}}catch(e){}
   selectCompany(currentCompany);
 }
 
-function showErr(m) {
-  const e = document.getElementById('loginError');
-  e.textContent = m; e.style.display = 'block';
-  setTimeout(() => e.style.display = 'none', 3000);
+function showErr(m){const e=document.getElementById('loginError');e.textContent=m;e.style.display='block';setTimeout(()=>e.style.display='none',3000);}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(tab==='bookings'){document.getElementById('tabBookings').classList.add('active');document.getElementById('navBookings').classList.add('active');}
+  else if(tab==='tasks'){document.getElementById('tabTasks').classList.add('active');document.getElementById('navTasks').classList.add('active');loadTasks();}
+  else if(tab==='schedule'){document.getElementById('tabSchedule').classList.add('active');document.getElementById('navSchedule').classList.add('active');loadSchedule();}
+  else if(tab==='admin'){document.getElementById('tabAdmin').classList.add('active');document.getElementById('navAdmin').classList.add('active');loadAdminData();}
 }
 
-// ─── Tab Navigation ───
-function switchTab(tab) {
-  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  if (tab === 'bookings') {
-    document.getElementById('tabBookings').classList.add('active');
-    document.getElementById('navBookings').classList.add('active');
-  } else if (tab === 'tasks') {
-    document.getElementById('tabTasks').classList.add('active');
-    document.getElementById('navTasks').classList.add('active');
-    loadTasks();
-  } else if (tab === 'admin') {
-    document.getElementById('tabAdmin').classList.add('active');
-    document.getElementById('navAdmin').classList.add('active');
-    loadAdminData();
-  }
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+// ═══ BOOKINGS ═══
+function selectCompany(id){currentCompany=id;localStorage.setItem('pp_company',id);document.querySelectorAll('.company-btn').forEach(b=>b.classList.remove('active'));document.getElementById('btn-'+id).classList.add('active');loadBookings(false);}
+
+async function loadBookings(refresh){
+  const list=document.getElementById('bookingList'),ld=document.getElementById('loadingState'),er=document.getElementById('errorState');
+  list.innerHTML='';ld.style.display='flex';er.style.display='none';document.getElementById('searchInput').value='';document.getElementById('statusBar').innerHTML='';openEditorIdx=-1;
+  if(refresh){try{await fetch('/api/scrape',{method:'POST',headers:ah(),body:JSON.stringify({company:currentCompany})});}catch(e){}}
+  try{
+    const today=new Date().toISOString().split('T')[0];const r=await fetch('/api/bookings?company='+currentCompany+'&date='+today,{headers:ah()});if(r.status===401){doLogout();return;}
+    const d=await r.json();if(d.error)throw new Error(d.error);allBookings=d.bookings||[];ld.style.display='none';
+    const cn=currentCompany==='parkking'?'Biemann':'Hasloh';const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
+    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${d.date||today}</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
+    if(!allBookings.length){er.textContent='Keine Buchungen für heute.';er.style.display='block';return;}
+    renderBookings(allBookings);showToast(allBookings.length+' Buchungen geladen ✓');
+  }catch(e){ld.style.display='none';er.innerHTML=`<div style="margin-bottom:8px">⚠️ ${e.message}</div><button class="btn btn-accent btn-sm" onclick="loadBookings(true)">Nochmal</button>`;er.style.display='block';}
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  BOOKINGS TAB
-// ═══════════════════════════════════════════════════════════════
+function filterBookings(){const q=document.getElementById('searchInput').value.trim().toLowerCase();const f=q?allBookings.filter(b=>(b.plate||'').toLowerCase().includes(q)||(b.name||'').toLowerCase().includes(q)):allBookings;renderBookings(f);}
+function markPrinted(idx){const b=allBookings[idx];if(b&&b.id){printedIds[b.id]=true;localStorage.setItem('pp_printed',JSON.stringify(printedIds));}}
 
-function selectCompany(id) {
-  currentCompany = id;
-  localStorage.setItem('pp_company', id);
-  document.querySelectorAll('.company-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('btn-' + id).classList.add('active');
-  loadBookings(false);
+function renderBookings(list){
+  const el=document.getElementById('bookingList');if(!list.length){el.innerHTML='<div class="empty">Keine Treffer.</div>';return;}
+  const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
+  el.innerHTML=list.map((b,i)=>{const idx=allBookings.indexOf(b);const isIn=b.type==='in';const ret=(b.date_out||'')+(b.time_out?' '+b.time_out:'');const time=b.time_in||b.time_out||'';const flight=b.flight_code&&b.flight_code!=='TO BE UPDATED'?b.flight_code:'';const printed=printedIds[b.id];
+  return`<div class="bcard" style="animation-delay:${Math.min(i,15)*0.03+0.05}s"><div class="bcard-row" onclick="toggleEditor(${idx})"><div class="bcard-stripe ${isIn?'in':'out'}">${flight?`<div class="sf">✈${esc(flight)}</div>`:''}<div class="st">${esc(time)||'—'}</div></div><div class="bcard-body"><div class="bcard-top"><span class="bcard-badge pk">${cn}</span><span>${printed?'<span class="bcard-printed">🖨 gedruckt</span>':''}${b.status==='checked'?'<span style="color:var(--green);font-size:16px;margin-left:4px">✓</span>':''}</span></div><div class="bcard-plate">${esc(b.plate)||'—'} ${b.external_id?'<span style="color:var(--text3);font-size:12px;font-weight:400">#'+esc(b.external_id)+'</span>':''}</div><div class="bcard-name">${esc(b.name)||'—'}</div><div class="bcard-meta">${ret?`<span>↩ <strong>${esc(ret)}</strong></span>`:''}${b.car?`<span>🚗 ${esc(b.car)}</span>`:''}${b.pax?`<span>👤 ${b.pax}</span>`:''}</div></div></div><div class="bcard-editor" id="editor-${idx}"><div class="ed-row"><div class="ed-col"><div class="ed-label">Kundenname</div><input class="ed-input" id="en-${idx}" value="${esc(b.name)}" oninput="rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Rückgabe Datum</div><input class="ed-input" id="ed-${idx}" value="${esc(b.date_out)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Uhrzeit</div><input class="ed-input" id="et-${idx}" value="${esc(b.time_out)}" oninput="rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Fahrzeug</div><input class="ed-input" id="ec-${idx}" value="${esc(b.car)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Kennzeichen</div><input class="ed-input plate" id="ep-${idx}" value="${esc(b.plate)}" oninput="this.value=this.value.toUpperCase();rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Stellplatz (optional)</div><input class="ed-input" id="es-${idx}" placeholder="z.B. Straße rechts, Reihe 3..." oninput="rl(${idx})"></div></div><div class="label-preview"><canvas id="cv-${idx}"></canvas></div><div class="ed-btns"><button class="btn btn-accent btn-sm" onclick="printL(${idx})">🖨 Drucken</button><button class="btn btn-white btn-sm" onclick="downloadL(${idx})">📲 Speichern</button><button class="btn btn-outline btn-sm" onclick="shareL(${idx})">↗ Teilen</button><button class="btn btn-ghost btn-sm" onclick="saveClose(${idx})">✓ Fertig</button></div></div></div>`;}).join('');
+  if(openEditorIdx>=0){const ed=document.getElementById('editor-'+openEditorIdx);if(ed){ed.classList.add('open');rl(openEditorIdx);}}
 }
 
-async function loadBookings(refresh) {
-  const list = document.getElementById('bookingList');
-  const ld = document.getElementById('loadingState');
-  const er = document.getElementById('errorState');
-  list.innerHTML = ''; ld.style.display = 'flex'; er.style.display = 'none';
-  document.getElementById('searchInput').value = '';
-  document.getElementById('statusBar').innerHTML = '';
-  openEditorIdx = -1;
-  if (refresh) {
-    try { await fetch('/api/scrape', { method: 'POST', headers: ah(), body: JSON.stringify({ company: currentCompany }) }); } catch (e) {}
-  }
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const r = await fetch('/api/bookings?company=' + currentCompany + '&date=' + today, { headers: ah() });
-    if (r.status === 401) { doLogout(); return; }
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    allBookings = d.bookings || [];
-    ld.style.display = 'none';
-    const cn = currentCompany === 'parkking' ? 'Biemann' : 'Hasloh';
-    const ins = allBookings.filter(b => b.type === 'in').length;
-    const outs = allBookings.filter(b => b.type === 'out').length;
-    document.getElementById('statusBar').innerHTML =
-      `<div class="status-chip chip-company">${cn}</div>` +
-      `<div class="status-chip chip-blue">${d.date || today}</div>` +
-      `<div class="status-chip chip-green">▶ ${ins} Annahmen</div>` +
-      (outs ? `<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>` : '');
-    if (!allBookings.length) { er.textContent = 'Keine Buchungen für heute.'; er.style.display = 'block'; return; }
-    renderBookings(allBookings);
-    showToast(allBookings.length + ' Buchungen geladen ✓');
-  } catch (e) {
-    ld.style.display = 'none';
-    er.innerHTML = `<div style="margin-bottom:8px">⚠️ ${e.message}</div><button class="btn btn-accent btn-sm" onclick="loadBookings(true)">Nochmal</button>`;
-    er.style.display = 'block';
-  }
+function toggleEditor(idx){if(openEditorIdx===idx){saveClose(idx);return;}if(openEditorIdx>=0){const p=document.getElementById('editor-'+openEditorIdx);if(p)p.classList.remove('open');}openEditorIdx=idx;const ed=document.getElementById('editor-'+idx);if(ed){ed.classList.add('open');rl(idx);}}
+
+async function saveClose(idx){const b=allBookings[idx];if(b&&b.id){const u={name:document.getElementById('en-'+idx).value.trim(),plate:document.getElementById('ep-'+idx).value.trim().toUpperCase(),car:document.getElementById('ec-'+idx).value.trim(),date_out:document.getElementById('ed-'+idx).value.trim(),time_out:document.getElementById('et-'+idx).value.trim(),comment:document.getElementById('es-'+idx).value.trim()};try{await fetch('/api/bookings/'+b.id,{method:'PUT',headers:ah(),body:JSON.stringify(u)});Object.assign(allBookings[idx],u);}catch(e){}}openEditorIdx=-1;const ed=document.getElementById('editor-'+idx);if(ed)ed.classList.remove('open');filterBookings();}
+
+function rl(idx){const name=(document.getElementById('en-'+idx)?.value||'').trim(),retDate=(document.getElementById('ed-'+idx)?.value||'').trim(),retTime=(document.getElementById('et-'+idx)?.value||'').trim(),car=(document.getElementById('ec-'+idx)?.value||'').trim(),plate=(document.getElementById('ep-'+idx)?.value||'').trim().toUpperCase(),spot=(document.getElementById('es-'+idx)?.value||'').trim(),cn=currentCompany==='parkking'?'Biemann':'Hasloh';const W=673,H=378,cv=document.getElementById('cv-'+idx);if(!cv)return;cv.width=W;cv.height=H;cv.style.width='100%';cv.style.maxWidth='300px';cv.style.height='auto';const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';c.textAlign='center';c.textBaseline='top';let y=0;let f1=24;c.font=`600 ${f1}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(name||'—').width>W-6&&f1>12){f1-=2;c.font=`600 ${f1}px "Helvetica Neue",Arial,sans-serif`;}c.fillText(name||'—',W/2,y);y+=f1;let fp=36;c.font=`900 ${fp}px "JetBrains Mono",monospace`;while(c.measureText(plate||'—').width>W-6&&fp>18){fp-=2;c.font=`900 ${fp}px "JetBrains Mono",monospace`;}c.fillText(plate||'—',W/2,y);y+=fp;let f2=108;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retDate||'—').width>W-4&&f2>50){f2-=4;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;}c.fillText(retDate||'—',W/2,y-6);y+=f2-8;let f3=88;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retTime||'—').width>W-4&&f3>40){f3-=4;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;}c.fillText(retTime||'—',W/2,y-4);c.textBaseline='bottom';if(spot){c.fillStyle='#000';let fs=26;c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(spot).width>W-6&&fs>14){fs-=2;c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;}c.fillText(spot,W/2,H-24);}c.fillStyle='#333';const botLine=cn+(car?' · '+car:'');let fb=22;c.font=`700 ${fb}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(botLine).width>W-6&&fb>12){fb-=2;c.font=`700 ${fb}px "Helvetica Neue",Arial,sans-serif`;}c.fillText(botLine,W/2,H);c.textAlign='left';}
+
+function gc(i){return document.getElementById('cv-'+i);}
+function printL(i){const cv=gc(i);if(!cv)return;markPrinted(i);filterBookings();const d=cv.toDataURL('image/png');const w=window.open('','_blank','width=600,height=400');w.document.write(`<!DOCTYPE html><html><head><title>Label</title><style>@page{size:57mm 32mm;margin:0}*{margin:0;padding:0}body{display:flex;justify-content:center;align-items:center;width:57mm;height:32mm}img{width:57mm;height:32mm;object-fit:contain}@media screen{body{background:#f0f0f0;padding:20px;width:auto;height:auto}img{border:1px solid #ccc}}</style></head><body><img src="${d}" onload="setTimeout(()=>{window.print();},300);"></body></html>`);w.document.close();showToast('Label gedruckt ✓');}
+function downloadL(i){const cv=gc(i);if(!cv)return;const p=(document.getElementById('ep-'+i)?.value||'label').trim().toUpperCase().replace(/[\s\.]/g,'-');const a=document.createElement('a');a.download=`label-${p}-${Date.now()}.png`;a.href=cv.toDataURL('image/png');a.click();showToast('Gespeichert ✓');}
+async function shareL(i){const cv=gc(i);if(!cv)return;try{const b=await new Promise(r=>cv.toBlob(r,'image/png'));const f=new File([b],'label.png',{type:'image/png'});if(navigator.canShare?.({files:[f]})){await navigator.share({files:[f],title:'Label'});}else{downloadL(i);}}catch(e){downloadL(i);}}
+
+// ═══ TASKS ═══
+async function loadTasks(){
+  const today=new Date().toISOString().split('T')[0];document.getElementById('tasksDate').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('taskLoading').style.display='flex';document.getElementById('taskList').innerHTML='';
+  try{const r=await fetch('/api/tasks?date='+today,{headers:ah()});if(r.status===401){doLogout();return;}const d=await r.json();allTasks=d.tasks||[];document.getElementById('taskLoading').style.display='none';renderTasks();}catch(e){document.getElementById('taskLoading').style.display='none';document.getElementById('taskList').innerHTML='<div class="task-empty">⚠️ Fehler beim Laden</div>';}
 }
 
-function filterBookings() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const f = q ? allBookings.filter(b => (b.plate || '').toLowerCase().includes(q) || (b.name || '').toLowerCase().includes(q)) : allBookings;
-  renderBookings(f);
+function renderTasks(){
+  const el=document.getElementById('taskList'),prog=document.getElementById('tasksProgress');
+  if(!allTasks.length){el.innerHTML='<div class="task-empty">Keine Aufgaben definiert.<br>Ein Admin kann Aufgaben im Admin-Panel anlegen.</div>';prog.style.display='none';return;}
+  const done=allTasks.filter(t=>t.completed_by_id).length,total=allTasks.length,pct=Math.round((done/total)*100);
+  prog.style.display='flex';document.getElementById('progressFill').style.width=pct+'%';document.getElementById('progressText').textContent=`${done}/${total}`;
+  el.innerHTML=allTasks.map((t,i)=>{const isDone=!!t.completed_by_id;return`<div class="task-card ${isDone?'done':''}" style="animation-delay:${i*0.04+0.05}s" onclick="toggleTask(${t.id})"><div class="task-check">${isDone?'✓':''}</div><div class="task-info"><div class="task-title">${esc(t.title)}</div>${t.description?`<div class="task-desc">${esc(t.description)}</div>`:''}${isDone?`<div class="task-meta">✓ ${esc(t.completed_by_name)} · ${formatTime(t.completed_at)}</div>`:''}</div></div>`;}).join('');
 }
 
-function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g,'&gt;'); }
+async function toggleTask(taskId){try{const r=await fetch('/api/tasks/'+taskId+'/toggle',{method:'POST',headers:ah()});const d=await r.json();showToast(d.message);loadTasks();}catch(e){showToast('Fehler ⚠️');}}
+function formatTime(dt){if(!dt)return'';try{const d=new Date(dt+'Z');return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return'';}}
 
-function markPrinted(idx) {
-  const b = allBookings[idx];
-  if (b && b.id) { printedIds[b.id] = true; localStorage.setItem('pp_printed', JSON.stringify(printedIds)); }
+// ═══ SCHEDULE ═══
+function getWeekDates(offset){
+  const now=new Date();now.setDate(now.getDate()+offset*7);
+  const day=now.getDay();const mondayOffset=day===0?-6:1-day;
+  const mon=new Date(now);mon.setDate(now.getDate()+mondayOffset);
+  const days=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);days.push(d);}
+  return days;
 }
 
-function renderBookings(list) {
-  const el = document.getElementById('bookingList');
-  if (!list.length) { el.innerHTML = '<div class="empty">Keine Treffer.</div>'; return; }
-  const cn = currentCompany === 'parkking' ? 'Biemann' : 'Hasloh';
-  el.innerHTML = list.map((b, i) => {
-    const idx = allBookings.indexOf(b);
-    const isIn = b.type === 'in';
-    const ret = (b.date_out || '') + (b.time_out ? ' ' + b.time_out : '');
-    const time = b.time_in || b.time_out || '';
-    const flight = b.flight_code && b.flight_code !== 'TO BE UPDATED' ? b.flight_code : '';
-    const printed = printedIds[b.id];
-    return `<div class="bcard" style="animation-delay:${Math.min(i, 15) * 0.03 + 0.05}s" id="bcard-${idx}">
-      <div class="bcard-row" onclick="toggleEditor(${idx})">
-        <div class="bcard-stripe ${isIn ? 'in' : 'out'}">${flight ? `<div class="sf">✈${esc(flight)}</div>` : ''}<div class="st">${esc(time) || '—'}</div></div>
-        <div class="bcard-body">
-          <div class="bcard-top"><span class="bcard-badge pk">${cn}</span><span>${printed ? '<span class="bcard-printed">🖨 gedruckt</span>' : ''}${b.status === 'checked' ? '<span style="color:var(--green);font-size:16px;margin-left:4px">✓</span>' : ''}</span></div>
-          <div class="bcard-plate">${esc(b.plate) || '—'} ${b.external_id ? '<span style="color:var(--text3);font-size:12px;font-weight:400">#' + esc(b.external_id) + '</span>' : ''}</div>
-          <div class="bcard-name">${esc(b.name) || '—'}</div>
-          <div class="bcard-meta">${ret ? `<span>↩ <strong>${esc(ret)}</strong></span>` : ''}${b.car ? `<span>🚗 ${esc(b.car)}</span>` : ''}${b.pax ? `<span>👤 ${b.pax}</span>` : ''}</div>
-        </div>
-      </div>
-      <div class="bcard-editor" id="editor-${idx}">
-        <div class="ed-row"><div class="ed-col"><div class="ed-label">Kundenname</div><input class="ed-input" id="en-${idx}" value="${esc(b.name)}" oninput="rl(${idx})"></div></div>
-        <div class="ed-row"><div class="ed-col"><div class="ed-label">Rückgabe Datum</div><input class="ed-input" id="ed-${idx}" value="${esc(b.date_out)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Uhrzeit</div><input class="ed-input" id="et-${idx}" value="${esc(b.time_out)}" oninput="rl(${idx})"></div></div>
-        <div class="ed-row"><div class="ed-col"><div class="ed-label">Fahrzeug</div><input class="ed-input" id="ec-${idx}" value="${esc(b.car)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Kennzeichen</div><input class="ed-input plate" id="ep-${idx}" value="${esc(b.plate)}" oninput="this.value=this.value.toUpperCase();rl(${idx})"></div></div>
-        <div class="ed-row"><div class="ed-col"><div class="ed-label">Stellplatz (optional)</div><input class="ed-input" id="es-${idx}" placeholder="z.B. Straße rechts, Reihe 3..." oninput="rl(${idx})"></div></div>
-        <div class="label-preview"><canvas id="cv-${idx}"></canvas></div>
-        <div class="ed-btns">
-          <button class="btn btn-accent btn-sm" onclick="printL(${idx})">🖨 Drucken</button>
-          <button class="btn btn-white btn-sm" onclick="downloadL(${idx})">📲 Speichern</button>
-          <button class="btn btn-outline btn-sm" onclick="shareL(${idx})">↗ Teilen</button>
-          <button class="btn btn-ghost btn-sm" onclick="saveClose(${idx})">✓ Fertig</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-  if (openEditorIdx >= 0) {
-    const ed = document.getElementById('editor-' + openEditorIdx);
-    if (ed) { ed.classList.add('open'); rl(openEditorIdx); }
-  }
+const DAY_NAMES=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+
+function getKW(date){const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));const dayNum=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-dayNum);const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil(((d-yearStart)/86400000+1)/7);}
+
+async function loadSchedule(){
+  const days=getWeekDates(scheduleWeekOffset);const weekStart=days[0].toISOString().split('T')[0];
+  const kw=getKW(days[0]);
+  document.getElementById('weekLabel').innerHTML=`KW ${kw}<span>${days[0].toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – ${days[6].toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>`;
+  document.getElementById('scheduleLoading').style.display='flex';document.getElementById('scheduleGrid').innerHTML='';document.getElementById('hoursSummary').style.display='none';
+  try{
+    const r=await fetch('/api/shifts?date='+weekStart,{headers:ah()});if(r.status===401){doLogout();return;}
+    const data=await r.json();document.getElementById('scheduleLoading').style.display='none';
+    const today=new Date().toISOString().split('T')[0];const isAdmin=currentUser&&currentUser.role==='admin';
+    const grid=document.getElementById('scheduleGrid');
+    grid.innerHTML=days.map((day,di)=>{
+      const dateStr=day.toISOString().split('T')[0];const isToday=dateStr===today;
+      const dayShifts=(data.shifts||[]).filter(s=>s.date===dateStr);
+      return`<div class="day-row"><div class="day-header ${isToday?'today':''}"><span class="day-name">${DAY_NAMES[di]}</span><span class="day-date">${day.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span></div><div class="day-shifts">${dayShifts.length?dayShifts.map(s=>{
+        const color=s.template_color||'#CC6CE7';const hrs=calcHours(s.start_time,s.end_time,s.break_min);
+        return`<div class="shift-pill" style="background:${color}20;color:${color};border-left:3px solid ${color}"><span class="shift-time">${s.start_time}–${s.end_time}</span><span class="shift-user">${esc(s.user_name)}</span><span class="shift-hours">${hrs.toFixed(1)}h</span>${isAdmin?`<button class="shift-del" onclick="event.stopPropagation();deleteShift(${s.id})">✕</button>`:''}</div>`;
+      }).join(''):'<div class="day-empty">Keine Schichten</div>'}${isAdmin?`<button class="day-add" onclick="openModal('addShift',{date:'${dateStr}',dayName:'${DAY_NAMES[di]} ${day.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}'})">+ Schicht</button>`:''}</div></div>`;
+    }).join('');
+
+    // Hours summary
+    if(data.hoursByUser&&Object.keys(data.hoursByUser).length){
+      document.getElementById('hoursSummary').style.display='block';
+      document.getElementById('hoursRows').innerHTML=Object.values(data.hoursByUser).sort((a,b)=>b.hours-a.hours).map(u=>`<div class="hours-row"><span class="hours-user">${esc(u.name)} <span style="font-size:11px;color:var(--text3);font-weight:400">(${u.shifts} Schichten)</span></span><span class="hours-val">${u.hours.toFixed(1)} Std</span></div>`).join('');
+    }
+  }catch(e){document.getElementById('scheduleLoading').style.display='none';document.getElementById('scheduleGrid').innerHTML='<div class="task-empty">⚠️ Fehler beim Laden</div>';}
 }
 
-function toggleEditor(idx) {
-  if (openEditorIdx === idx) { saveClose(idx); return; }
-  if (openEditorIdx >= 0) { const p = document.getElementById('editor-' + openEditorIdx); if (p) p.classList.remove('open'); }
-  openEditorIdx = idx;
-  const ed = document.getElementById('editor-' + idx);
-  if (ed) { ed.classList.add('open'); rl(idx); }
+function changeWeek(dir){scheduleWeekOffset+=dir;loadSchedule();}
+function calcHours(s,e,brk){const[sh,sm]=s.split(':').map(Number),[eh,em]=e.split(':').map(Number);let st=sh*60+sm,en=eh*60+em;if(en<=st)en+=1440;return Math.max(0,(en-st-(brk||0))/60);}
+
+async function deleteShift(id){if(!confirm('Schicht löschen?'))return;try{await fetch('/api/shifts/'+id,{method:'DELETE',headers:ah()});showToast('Schicht gelöscht ✓');loadSchedule();}catch(e){showToast('Fehler ⚠️');}}
+
+// ═══ ADMIN ═══
+async function loadAdminData(){await Promise.all([loadUsers(),loadAdminTasks(),loadAdminTemplates(),loadMonthlyHours()]);}
+
+async function loadUsers(){try{const r=await fetch('/api/users',{headers:ah()});if(r.status===403)return;allUsers=await r.json();renderUsers(allUsers);}catch(e){}}
+
+function renderUsers(users){
+  document.getElementById('userList').innerHTML=users.map(u=>{const initials=(u.display_name||u.username).split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);const roleCls=u.role==='admin'?'role-admin':'role-staff';const roleLabel=u.role==='admin'?'Admin':'Mitarbeiter';
+  return`<div class="admin-card" ${!u.active?'style="opacity:0.5"':''}><div class="admin-card-row"><div class="admin-avatar">${initials}</div><div class="admin-card-info"><div class="admin-card-name">${esc(u.display_name)} ${!u.active?'<span class="role-badge role-inactive">Inaktiv</span>':''}</div><div class="admin-card-sub">@${esc(u.username)} · <span class="role-badge ${roleCls}">${roleLabel}</span></div></div></div>${currentUser&&u.id!==currentUser.id?`<div class="admin-actions"><button class="btn btn-white btn-xs" onclick="openEditUser(${u.id},${JSON.stringify(u.display_name).replace(/"/g,'&quot;')},${JSON.stringify(u.role).replace(/"/g,'&quot;')},${u.active})">Bearbeiten</button>${u.active?`<button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deactivateUser(${u.id},${JSON.stringify(u.display_name).replace(/"/g,'&quot;')})">Deaktivieren</button>`:`<button class="btn btn-xs" style="background:var(--green-bg);color:var(--green);border:none" onclick="reactivateUser(${u.id})">Aktivieren</button>`}</div>`:''}</div>`;}).join('');
 }
 
-async function saveClose(idx) {
-  const b = allBookings[idx];
-  if (b && b.id) {
-    const u = {
-      name: document.getElementById('en-' + idx).value.trim(),
-      plate: document.getElementById('ep-' + idx).value.trim().toUpperCase(),
-      car: document.getElementById('ec-' + idx).value.trim(),
-      date_out: document.getElementById('ed-' + idx).value.trim(),
-      time_out: document.getElementById('et-' + idx).value.trim(),
-      comment: document.getElementById('es-' + idx).value.trim()
-    };
-    try { await fetch('/api/bookings/' + b.id, { method: 'PUT', headers: ah(), body: JSON.stringify(u) }); Object.assign(allBookings[idx], u); } catch (e) {}
-  }
-  openEditorIdx = -1;
-  const ed = document.getElementById('editor-' + idx);
-  if (ed) ed.classList.remove('open');
-  filterBookings();
+async function loadAdminTasks(){try{const r=await fetch('/api/tasks',{headers:ah()});const d=await r.json();renderAdminTasks(d.tasks||[]);}catch(e){}}
+function renderAdminTasks(tasks){if(!tasks.length){document.getElementById('adminTaskList').innerHTML='<div class="task-empty">Noch keine Aufgaben.</div>';return;}document.getElementById('adminTaskList').innerHTML=tasks.map(t=>`<div class="admin-card"><div class="admin-card-row"><div class="admin-avatar" style="background:var(--orange-bg);color:var(--orange)">📋</div><div class="admin-card-info"><div class="admin-card-name">${esc(t.title)}</div>${t.description?`<div class="admin-card-sub">${esc(t.description)}</div>`:''}</div></div><div class="admin-actions"><button class="btn btn-white btn-xs" onclick="openEditTask(${t.id},${JSON.stringify(t.title).replace(/"/g,'&quot;')},${JSON.stringify(t.description||'').replace(/"/g,'&quot;')})">Bearbeiten</button><button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deleteTask(${t.id},${JSON.stringify(t.title).replace(/"/g,'&quot;')})">Entfernen</button></div></div>`).join('');}
+
+async function loadAdminTemplates(){try{const r=await fetch('/api/shift-templates',{headers:ah()});shiftTemplates=await r.json();renderAdminTemplates();}catch(e){}}
+function renderAdminTemplates(){if(!shiftTemplates.length){document.getElementById('adminTemplateList').innerHTML='<div class="task-empty">Keine Vorlagen.</div>';return;}document.getElementById('adminTemplateList').innerHTML=shiftTemplates.map(t=>`<div class="admin-card"><div class="admin-card-row"><div class="admin-avatar" style="background:${t.color}20;color:${t.color}">🕐</div><div class="admin-card-info"><div class="admin-card-name">${esc(t.name)}</div><div class="admin-card-sub">${t.start_time} – ${t.end_time} · ${calcHours(t.start_time,t.end_time,0).toFixed(1)} Std</div></div></div><div class="admin-actions"><button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deleteTemplate(${t.id})">Entfernen</button></div></div>`).join('');}
+
+async function loadMonthlyHours(){
+  const month=new Date().toISOString().slice(0,7);
+  try{const r=await fetch('/api/shifts/hours?month='+month,{headers:ah()});const d=await r.json();const entries=Object.values(d.summary||{});
+  if(!entries.length){document.getElementById('monthlyHours').innerHTML='<div class="task-empty">Keine Daten für diesen Monat.</div>';return;}
+  document.getElementById('monthlyHours').innerHTML=`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${new Date().toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</div>`+entries.sort((a,b)=>b.totalHours-a.totalHours).map(u=>`<div class="hours-row"><span class="hours-user">${esc(u.name)} <span style="font-size:11px;color:var(--text3);font-weight:400">${u.totalShifts} Schichten</span></span><span class="hours-val">${u.totalHours.toFixed(1)} Std</span></div>`).join('');
+  }catch(e){}
 }
 
-// ─── Label rendering ───
-function rl(idx) {
-  const name = (document.getElementById('en-' + idx)?.value || '').trim();
-  const retDate = (document.getElementById('ed-' + idx)?.value || '').trim();
-  const retTime = (document.getElementById('et-' + idx)?.value || '').trim();
-  const car = (document.getElementById('ec-' + idx)?.value || '').trim();
-  const plate = (document.getElementById('ep-' + idx)?.value || '').trim().toUpperCase();
-  const spot = (document.getElementById('es-' + idx)?.value || '').trim();
-  const cn = currentCompany === 'parkking' ? 'Biemann' : 'Hasloh';
-  const W = 673, H = 378, cv = document.getElementById('cv-' + idx);
-  if (!cv) return;
-  cv.width = W; cv.height = H; cv.style.width = '100%'; cv.style.maxWidth = '300px'; cv.style.height = 'auto';
-  const c = cv.getContext('2d');
-  c.fillStyle = '#fff'; c.fillRect(0, 0, W, H);
-  c.fillStyle = '#000'; c.textAlign = 'center'; c.textBaseline = 'top';
-  let y = 0;
-  let f1 = 24; c.font = `600 ${f1}px "Helvetica Neue",Arial,sans-serif`;
-  while (c.measureText(name || '—').width > W - 6 && f1 > 12) { f1 -= 2; c.font = `600 ${f1}px "Helvetica Neue",Arial,sans-serif`; }
-  c.fillText(name || '—', W / 2, y); y += f1;
-  let fp = 36; c.font = `900 ${fp}px "JetBrains Mono",monospace`;
-  while (c.measureText(plate || '—').width > W - 6 && fp > 18) { fp -= 2; c.font = `900 ${fp}px "JetBrains Mono",monospace`; }
-  c.fillText(plate || '—', W / 2, y); y += fp;
-  let f2 = 108; c.font = `900 ${f2}px "Helvetica Neue",Arial,sans-serif`;
-  while (c.measureText(retDate || '—').width > W - 4 && f2 > 50) { f2 -= 4; c.font = `900 ${f2}px "Helvetica Neue",Arial,sans-serif`; }
-  c.fillText(retDate || '—', W / 2, y - 6); y += f2 - 8;
-  let f3 = 88; c.font = `900 ${f3}px "Helvetica Neue",Arial,sans-serif`;
-  while (c.measureText(retTime || '—').width > W - 4 && f3 > 40) { f3 -= 4; c.font = `900 ${f3}px "Helvetica Neue",Arial,sans-serif`; }
-  c.fillText(retTime || '—', W / 2, y - 4);
-  c.textBaseline = 'bottom';
-  if (spot) { c.fillStyle = '#000'; let fs = 26; c.font = `800 ${fs}px "Helvetica Neue",Arial,sans-serif`; while (c.measureText(spot).width > W - 6 && fs > 14) { fs -= 2; c.font = `800 ${fs}px "Helvetica Neue",Arial,sans-serif`; } c.fillText(spot, W / 2, H - 24); }
-  c.fillStyle = '#333';
-  const botLine = cn + (car ? ' · ' + car : '');
-  let fb = 22; c.font = `700 ${fb}px "Helvetica Neue",Arial,sans-serif`;
-  while (c.measureText(botLine).width > W - 6 && fb > 12) { fb -= 2; c.font = `700 ${fb}px "Helvetica Neue",Arial,sans-serif`; }
-  c.fillText(botLine, W / 2, H);
-  c.textAlign = 'left';
-}
-
-function gc(i) { return document.getElementById('cv-' + i); }
-
-function printL(i) {
-  const cv = gc(i); if (!cv) return;
-  markPrinted(i); filterBookings();
-  const d = cv.toDataURL('image/png');
-  const w = window.open('', '_blank', 'width=600,height=400');
-  w.document.write(`<!DOCTYPE html><html><head><title>Label</title><style>@page{size:57mm 32mm;margin:0}*{margin:0;padding:0}body{display:flex;justify-content:center;align-items:center;width:57mm;height:32mm}img{width:57mm;height:32mm;object-fit:contain}@media screen{body{background:#f0f0f0;padding:20px;width:auto;height:auto}img{border:1px solid #ccc}}</style></head><body><img src="${d}" onload="setTimeout(()=>{window.print();},300);"></body></html>`);
-  w.document.close();
-  showToast('Label gedruckt ✓');
-}
-
-function downloadL(i) {
-  const cv = gc(i); if (!cv) return;
-  const p = (document.getElementById('ep-' + i)?.value || 'label').trim().toUpperCase().replace(/[\s\.]/g, '-');
-  const a = document.createElement('a');
-  a.download = `label-${p}-${Date.now()}.png`;
-  a.href = cv.toDataURL('image/png');
-  a.click();
-  showToast('Gespeichert ✓');
-}
-
-async function shareL(i) {
-  const cv = gc(i); if (!cv) return;
-  try {
-    const b = await new Promise(r => cv.toBlob(r, 'image/png'));
-    const f = new File([b], 'label.png', { type: 'image/png' });
-    if (navigator.canShare?.({ files: [f] })) { await navigator.share({ files: [f], title: 'Label' }); }
-    else { downloadL(i); }
-  } catch (e) { downloadL(i); }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  TASKS TAB
-// ═══════════════════════════════════════════════════════════════
-
-async function loadTasks() {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('tasksDate').textContent = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
-  document.getElementById('taskLoading').style.display = 'flex';
-  document.getElementById('taskList').innerHTML = '';
-  try {
-    const r = await fetch('/api/tasks?date=' + today, { headers: ah() });
-    if (r.status === 401) { doLogout(); return; }
-    const d = await r.json();
-    allTasks = d.tasks || [];
-    document.getElementById('taskLoading').style.display = 'none';
-    renderTasks();
-  } catch (e) {
-    document.getElementById('taskLoading').style.display = 'none';
-    document.getElementById('taskList').innerHTML = '<div class="task-empty">⚠️ Fehler beim Laden</div>';
-  }
-}
-
-function renderTasks() {
-  const el = document.getElementById('taskList');
-  const prog = document.getElementById('tasksProgress');
-  if (!allTasks.length) {
-    el.innerHTML = '<div class="task-empty">Keine Aufgaben definiert.<br>Ein Admin kann Aufgaben im Admin-Panel anlegen.</div>';
-    prog.style.display = 'none';
-    return;
-  }
-  const done = allTasks.filter(t => t.completed_by_id).length;
-  const total = allTasks.length;
-  const pct = Math.round((done / total) * 100);
-  prog.style.display = 'flex';
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressText').textContent = `${done}/${total}`;
-  el.innerHTML = allTasks.map((t, i) => {
-    const isDone = !!t.completed_by_id;
-    return `<div class="task-card ${isDone ? 'done' : ''}" style="animation-delay:${i * 0.04 + 0.05}s" onclick="toggleTask(${t.id})">
-      <div class="task-check">${isDone ? '✓' : ''}</div>
-      <div class="task-info">
-        <div class="task-title">${esc(t.title)}</div>
-        ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
-        ${isDone ? `<div class="task-meta">✓ ${esc(t.completed_by_name)} · ${formatTime(t.completed_at)}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function toggleTask(taskId) {
-  try {
-    const r = await fetch('/api/tasks/' + taskId + '/toggle', { method: 'POST', headers: ah() });
-    const d = await r.json();
-    showToast(d.message);
-    loadTasks();
-  } catch (e) { showToast('Fehler ⚠️'); }
-}
-
-function formatTime(dt) {
-  if (!dt) return '';
-  try { const d = new Date(dt + 'Z'); return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  ADMIN TAB
-// ═══════════════════════════════════════════════════════════════
-
-async function loadAdminData() {
-  await Promise.all([loadUsers(), loadAdminTasks()]);
-}
-
-async function loadUsers() {
-  try {
-    const r = await fetch('/api/users', { headers: ah() });
-    if (r.status === 403) { document.getElementById('userList').innerHTML = '<div class="task-empty">Kein Zugriff</div>'; return; }
-    const users = await r.json();
-    renderUsers(users);
-  } catch (e) {}
-}
-
-function renderUsers(users) {
-  document.getElementById('userList').innerHTML = users.map(u => {
-    const initials = (u.display_name || u.username).split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    const roleCls = u.role === 'admin' ? 'role-admin' : 'role-staff';
-    const roleLabel = u.role === 'admin' ? 'Admin' : 'Mitarbeiter';
-    return `<div class="admin-card" ${!u.active ? 'style="opacity:0.5"' : ''}>
-      <div class="admin-card-row">
-        <div class="admin-avatar">${initials}</div>
-        <div class="admin-card-info">
-          <div class="admin-card-name">${esc(u.display_name)} ${!u.active ? '<span class="role-badge role-inactive">Inaktiv</span>' : ''}</div>
-          <div class="admin-card-sub">@${esc(u.username)} · <span class="role-badge ${roleCls}">${roleLabel}</span></div>
-        </div>
-      </div>
-      ${currentUser && u.id !== currentUser.id ? `<div class="admin-actions">
-        <button class="btn btn-white btn-xs" onclick="openEditUser(${u.id},${JSON.stringify(u.display_name).replace(/"/g,'&quot;')},${JSON.stringify(u.role).replace(/"/g,'&quot;')},${u.active})">Bearbeiten</button>
-        ${u.active ? `<button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deactivateUser(${u.id},${JSON.stringify(u.display_name).replace(/"/g,'&quot;')})">Deaktivieren</button>` : `<button class="btn btn-xs" style="background:var(--green-bg);color:var(--green);border:none" onclick="reactivateUser(${u.id})">Aktivieren</button>`}
-      </div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-async function loadAdminTasks() {
-  try {
-    const r = await fetch('/api/tasks', { headers: ah() });
-    const d = await r.json();
-    renderAdminTasks(d.tasks || []);
-  } catch (e) {}
-}
-
-function renderAdminTasks(tasks) {
-  if (!tasks.length) {
-    document.getElementById('adminTaskList').innerHTML = '<div class="task-empty">Noch keine Aufgaben angelegt.</div>';
-    return;
-  }
-  document.getElementById('adminTaskList').innerHTML = tasks.map(t => {
-    return `<div class="admin-card">
-      <div class="admin-card-row">
-        <div class="admin-avatar" style="background:var(--orange-bg);color:var(--orange)">📋</div>
-        <div class="admin-card-info">
-          <div class="admin-card-name">${esc(t.title)}</div>
-          ${t.description ? `<div class="admin-card-sub">${esc(t.description)}</div>` : ''}
-        </div>
-      </div>
-      <div class="admin-actions">
-        <button class="btn btn-white btn-xs" onclick="openEditTask(${t.id},${JSON.stringify(t.title).replace(/"/g,'&quot;')},${JSON.stringify(t.description||'').replace(/"/g,'&quot;')})">Bearbeiten</button>
-        <button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deleteTask(${t.id},${JSON.stringify(t.title).replace(/"/g,'&quot;')})">Entfernen</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ─── Modals ───
-function openModal(type, data) {
-  const overlay = document.getElementById('modalOverlay');
-  const content = document.getElementById('modalContent');
-  if (type === 'addUser') {
-    content.innerHTML = `
-      <div class="modal-title">Neuer Benutzer <button class="modal-close" onclick="closeModal()">✕</button></div>
-      <div class="form-group"><label class="form-label">Anzeigename</label><input class="form-input" id="muName" placeholder="z.B. Max Mustermann"></div>
-      <div class="form-group"><label class="form-label">Benutzername</label><input class="form-input" id="muUsername" placeholder="z.B. max"></div>
-      <div class="form-group"><label class="form-label">Passwort</label><input class="form-input" id="muPassword" type="password" placeholder="Min. 6 Zeichen"></div>
-      <div class="form-group"><label class="form-label">Rolle</label><select class="form-input" id="muRole"><option value="staff">Mitarbeiter</option><option value="admin">Admin</option></select></div>
-      <button class="btn btn-accent btn-full" onclick="createUser()">Benutzer erstellen</button>`;
-  } else if (type === 'addTask') {
-    content.innerHTML = `
-      <div class="modal-title">Neue Tagesaufgabe <button class="modal-close" onclick="closeModal()">✕</button></div>
-      <div class="form-group"><label class="form-label">Titel</label><input class="form-input" id="mtTitle" placeholder="z.B. Parkplatz kontrollieren"></div>
-      <div class="form-group"><label class="form-label">Beschreibung (optional)</label><input class="form-input" id="mtDesc" placeholder="Details zur Aufgabe..."></div>
-      <button class="btn btn-accent btn-full" onclick="createTask()">Aufgabe erstellen</button>`;
-  } else if (type === 'editUser') {
-    content.innerHTML = `
-      <div class="modal-title">Benutzer bearbeiten <button class="modal-close" onclick="closeModal()">✕</button></div>
-      <div class="form-group"><label class="form-label">Anzeigename</label><input class="form-input" id="euName" value="${esc(data.name)}"></div>
-      <div class="form-group"><label class="form-label">Neues Passwort (leer = unverändert)</label><input class="form-input" id="euPassword" type="password" placeholder="Neues Passwort"></div>
-      <div class="form-group"><label class="form-label">Rolle</label><select class="form-input" id="euRole"><option value="staff" ${data.role === 'staff' ? 'selected' : ''}>Mitarbeiter</option><option value="admin" ${data.role === 'admin' ? 'selected' : ''}>Admin</option></select></div>
-      <button class="btn btn-accent btn-full" onclick="updateUser(${data.id})">Speichern</button>`;
-  } else if (type === 'editTask') {
-    content.innerHTML = `
-      <div class="modal-title">Aufgabe bearbeiten <button class="modal-close" onclick="closeModal()">✕</button></div>
-      <div class="form-group"><label class="form-label">Titel</label><input class="form-input" id="etTitle" value="${esc(data.title)}"></div>
-      <div class="form-group"><label class="form-label">Beschreibung</label><input class="form-input" id="etDesc" value="${esc(data.description)}"></div>
-      <button class="btn btn-accent btn-full" onclick="updateTask(${data.id})">Speichern</button>`;
+// ═══ MODALS ═══
+function openModal(type,data){
+  const overlay=document.getElementById('modalOverlay'),content=document.getElementById('modalContent');
+  if(type==='addUser'){content.innerHTML=`<div class="modal-title">Neuer Benutzer <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Anzeigename</label><input class="form-input" id="muName" placeholder="z.B. Max Mustermann"></div><div class="form-group"><label class="form-label">Benutzername</label><input class="form-input" id="muUsername" placeholder="z.B. max"></div><div class="form-group"><label class="form-label">Passwort</label><input class="form-input" id="muPassword" type="password" placeholder="Min. 6 Zeichen"></div><div class="form-group"><label class="form-label">Rolle</label><select class="form-input" id="muRole"><option value="staff">Mitarbeiter</option><option value="admin">Admin</option></select></div><button class="btn btn-accent btn-full" onclick="createUser()">Benutzer erstellen</button>`;}
+  else if(type==='addTask'){content.innerHTML=`<div class="modal-title">Neue Tagesaufgabe <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Titel</label><input class="form-input" id="mtTitle" placeholder="z.B. Parkplatz kontrollieren"></div><div class="form-group"><label class="form-label">Beschreibung (optional)</label><input class="form-input" id="mtDesc" placeholder="Details..."></div><button class="btn btn-accent btn-full" onclick="createTask()">Aufgabe erstellen</button>`;}
+  else if(type==='editUser'){content.innerHTML=`<div class="modal-title">Benutzer bearbeiten <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Anzeigename</label><input class="form-input" id="euName" value="${esc(data.name)}"></div><div class="form-group"><label class="form-label">Neues Passwort (leer = unverändert)</label><input class="form-input" id="euPassword" type="password"></div><div class="form-group"><label class="form-label">Rolle</label><select class="form-input" id="euRole"><option value="staff" ${data.role==='staff'?'selected':''}>Mitarbeiter</option><option value="admin" ${data.role==='admin'?'selected':''}>Admin</option></select></div><button class="btn btn-accent btn-full" onclick="updateUser(${data.id})">Speichern</button>`;}
+  else if(type==='editTask'){content.innerHTML=`<div class="modal-title">Aufgabe bearbeiten <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Titel</label><input class="form-input" id="etTitle" value="${esc(data.title)}"></div><div class="form-group"><label class="form-label">Beschreibung</label><input class="form-input" id="etDesc" value="${esc(data.description)}"></div><button class="btn btn-accent btn-full" onclick="updateTask(${data.id})">Speichern</button>`;}
+  else if(type==='addTemplate'){content.innerHTML=`<div class="modal-title">Neue Schichtvorlage <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Name</label><input class="form-input" id="stName" placeholder="z.B. Frühschicht"></div><div class="form-group"><label class="form-label">Startzeit</label><input class="form-input" id="stStart" type="time" value="03:00"></div><div class="form-group"><label class="form-label">Endzeit</label><input class="form-input" id="stEnd" type="time" value="12:00"></div><div class="form-group"><label class="form-label">Farbe</label><input type="color" id="stColor" value="#CC6CE7" style="width:100%;height:44px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer"></div><button class="btn btn-accent btn-full" onclick="createTemplate()">Vorlage erstellen</button>`;}
+  else if(type==='addShift'){
+    const activeUsers=(allUsers||[]).filter(u=>u.active);
+    const tplOptions=shiftTemplates.map(t=>`<option value="${t.id}" data-start="${t.start_time}" data-end="${t.end_time}">${t.name} (${t.start_time}–${t.end_time})</option>`).join('');
+    content.innerHTML=`<div class="modal-title">Schicht: ${data.dayName} <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Mitarbeiter</label><select class="form-input" id="shUser">${activeUsers.map(u=>`<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Vorlage (optional)</label><select class="form-input" id="shTpl" onchange="applyTemplate()"><option value="">— Individuelle Zeit —</option>${tplOptions}</select></div><div class="form-group"><label class="form-label">Startzeit</label><input class="form-input" id="shStart" type="time" value="03:00"></div><div class="form-group"><label class="form-label">Endzeit</label><input class="form-input" id="shEnd" type="time" value="12:00"></div><div class="form-group"><label class="form-label">Pause (Minuten)</label><input class="form-input" id="shBreak" type="number" value="0" min="0" max="120"></div><div class="form-group"><label class="form-label">Notiz (optional)</label><input class="form-input" id="shNote" placeholder="z.B. Shuttle-Dienst"></div><input type="hidden" id="shDate" value="${data.date}"><button class="btn btn-accent btn-full" onclick="createShift()">Schicht eintragen</button>`;
   }
   overlay.classList.add('open');
 }
 
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function applyTemplate(){const sel=document.getElementById('shTpl');const opt=sel.options[sel.selectedIndex];if(opt.dataset.start){document.getElementById('shStart').value=opt.dataset.start;document.getElementById('shEnd').value=opt.dataset.end;}}
 
-// ─── Admin Actions ───
-async function createUser() {
-  const name = document.getElementById('muName').value.trim();
-  const username = document.getElementById('muUsername').value.trim();
-  const password = document.getElementById('muPassword').value;
-  const role = document.getElementById('muRole').value;
-  if (!name || !username || !password) { showToast('Alle Felder ausfüllen ⚠️'); return; }
-  if (password.length < 6) { showToast('Passwort min. 6 Zeichen ⚠️'); return; }
-  try {
-    const r = await fetch('/api/users', { method: 'POST', headers: ah(), body: JSON.stringify({ username, password, display_name: name, role }) });
-    const d = await r.json();
-    if (d.error) { showToast(d.error + ' ⚠️'); return; }
-    showToast('Benutzer erstellt ✓');
-    closeModal(); loadUsers();
-  } catch (e) { showToast('Fehler ⚠️'); }
-}
+// ─── Action handlers ───
+async function createUser(){const name=document.getElementById('muName').value.trim(),username=document.getElementById('muUsername').value.trim(),password=document.getElementById('muPassword').value,role=document.getElementById('muRole').value;if(!name||!username||!password){showToast('Alle Felder ausfüllen ⚠️');return;}if(password.length<6){showToast('Passwort min. 6 Zeichen ⚠️');return;}try{const r=await fetch('/api/users',{method:'POST',headers:ah(),body:JSON.stringify({username,password,display_name:name,role})});const d=await r.json();if(d.error){showToast(d.error+' ⚠️');return;}showToast('Benutzer erstellt ✓');closeModal();loadUsers();}catch(e){showToast('Fehler ⚠️');}}
+function openEditUser(id,name,role,active){openModal('editUser',{id,name,role,active});}
+async function updateUser(id){const updates={display_name:document.getElementById('euName').value.trim(),role:document.getElementById('euRole').value};const pw=document.getElementById('euPassword').value;if(pw)updates.password=pw;try{await fetch('/api/users/'+id,{method:'PUT',headers:ah(),body:JSON.stringify(updates)});showToast('Benutzer aktualisiert ✓');closeModal();loadUsers();}catch(e){showToast('Fehler ⚠️');}}
+async function deactivateUser(id,name){if(!confirm('Benutzer "'+name+'" deaktivieren?'))return;try{await fetch('/api/users/'+id,{method:'DELETE',headers:ah()});showToast('Deaktiviert ✓');loadUsers();}catch(e){showToast('Fehler ⚠️');}}
+async function reactivateUser(id){try{await fetch('/api/users/'+id,{method:'PUT',headers:ah(),body:JSON.stringify({active:true})});showToast('Aktiviert ✓');loadUsers();}catch(e){showToast('Fehler ⚠️');}}
 
-function openEditUser(id, name, role, active) { openModal('editUser', { id, name, role, active }); }
+async function createTask(){const title=document.getElementById('mtTitle').value.trim(),description=document.getElementById('mtDesc').value.trim();if(!title){showToast('Titel erforderlich ⚠️');return;}try{const r=await fetch('/api/tasks',{method:'POST',headers:ah(),body:JSON.stringify({title,description})});const d=await r.json();if(d.error){showToast(d.error+' ⚠️');return;}showToast('Aufgabe erstellt ✓');closeModal();loadAdminTasks();}catch(e){showToast('Fehler ⚠️');}}
+function openEditTask(id,title,description){openModal('editTask',{id,title,description});}
+async function updateTask(id){const title=document.getElementById('etTitle').value.trim(),description=document.getElementById('etDesc').value.trim();if(!title){showToast('Titel erforderlich ⚠️');return;}try{await fetch('/api/tasks/'+id,{method:'PUT',headers:ah(),body:JSON.stringify({title,description})});showToast('Aktualisiert ✓');closeModal();loadAdminTasks();}catch(e){showToast('Fehler ⚠️');}}
+async function deleteTask(id,title){if(!confirm('Aufgabe "'+title+'" entfernen?'))return;try{await fetch('/api/tasks/'+id,{method:'DELETE',headers:ah()});showToast('Entfernt ✓');loadAdminTasks();}catch(e){showToast('Fehler ⚠️');}}
 
-async function updateUser(id) {
-  const updates = { display_name: document.getElementById('euName').value.trim(), role: document.getElementById('euRole').value };
-  const pw = document.getElementById('euPassword').value;
-  if (pw) updates.password = pw;
-  try {
-    await fetch('/api/users/' + id, { method: 'PUT', headers: ah(), body: JSON.stringify(updates) });
-    showToast('Benutzer aktualisiert ✓');
-    closeModal(); loadUsers();
-  } catch (e) { showToast('Fehler ⚠️'); }
-}
+async function createTemplate(){const name=document.getElementById('stName').value.trim(),start_time=document.getElementById('stStart').value,end_time=document.getElementById('stEnd').value,color=document.getElementById('stColor').value;if(!name||!start_time||!end_time){showToast('Alle Felder ausfüllen ⚠️');return;}try{await fetch('/api/shift-templates',{method:'POST',headers:ah(),body:JSON.stringify({name,start_time,end_time,color})});showToast('Vorlage erstellt ✓');closeModal();loadAdminTemplates();}catch(e){showToast('Fehler ⚠️');}}
+async function deleteTemplate(id){if(!confirm('Vorlage löschen?'))return;try{await fetch('/api/shift-templates/'+id,{method:'DELETE',headers:ah()});showToast('Entfernt ✓');loadAdminTemplates();}catch(e){showToast('Fehler ⚠️');}}
 
-async function deactivateUser(id, name) {
-  if (!confirm('Benutzer "' + name + '" wirklich deaktivieren?')) return;
-  try { await fetch('/api/users/' + id, { method: 'DELETE', headers: ah() }); showToast('Benutzer deaktiviert ✓'); loadUsers(); } catch (e) { showToast('Fehler ⚠️'); }
-}
-
-async function reactivateUser(id) {
-  try { await fetch('/api/users/' + id, { method: 'PUT', headers: ah(), body: JSON.stringify({ active: true }) }); showToast('Benutzer aktiviert ✓'); loadUsers(); } catch (e) { showToast('Fehler ⚠️'); }
-}
-
-async function createTask() {
-  const title = document.getElementById('mtTitle').value.trim();
-  const description = document.getElementById('mtDesc').value.trim();
-  if (!title) { showToast('Titel erforderlich ⚠️'); return; }
-  try {
-    const r = await fetch('/api/tasks', { method: 'POST', headers: ah(), body: JSON.stringify({ title, description }) });
-    const d = await r.json();
-    if (d.error) { showToast(d.error + ' ⚠️'); return; }
-    showToast('Aufgabe erstellt ✓');
-    closeModal(); loadAdminTasks();
-  } catch (e) { showToast('Fehler ⚠️'); }
-}
-
-function openEditTask(id, title, description) { openModal('editTask', { id, title, description }); }
-
-async function updateTask(id) {
-  const title = document.getElementById('etTitle').value.trim();
-  const description = document.getElementById('etDesc').value.trim();
-  if (!title) { showToast('Titel erforderlich ⚠️'); return; }
-  try { await fetch('/api/tasks/' + id, { method: 'PUT', headers: ah(), body: JSON.stringify({ title, description }) }); showToast('Aufgabe aktualisiert ✓'); closeModal(); loadAdminTasks(); } catch (e) { showToast('Fehler ⚠️'); }
-}
-
-async function deleteTask(id, title) {
-  if (!confirm('Aufgabe "' + title + '" wirklich entfernen?')) return;
-  try { await fetch('/api/tasks/' + id, { method: 'DELETE', headers: ah() }); showToast('Aufgabe entfernt ✓'); loadAdminTasks(); } catch (e) { showToast('Fehler ⚠️'); }
-}
-
-// ─── Toast ───
-function showToast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
+async function createShift(){const user_id=parseInt(document.getElementById('shUser').value),date=document.getElementById('shDate').value,start_time=document.getElementById('shStart').value,end_time=document.getElementById('shEnd').value,break_min=parseInt(document.getElementById('shBreak').value)||0,note=document.getElementById('shNote').value.trim();const tplSel=document.getElementById('shTpl');const template_id=tplSel.value?parseInt(tplSel.value):null;if(!user_id||!date||!start_time||!end_time){showToast('Alle Pflichtfelder ausfüllen ⚠️');return;}try{await fetch('/api/shifts',{method:'POST',headers:ah(),body:JSON.stringify({user_id,date,template_id,start_time,end_time,break_min,note})});showToast('Schicht eingetragen ✓');closeModal();loadSchedule();}catch(e){showToast('Fehler ⚠️');}}
 </script>
 </body>
 </html>

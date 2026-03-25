@@ -173,6 +173,32 @@ function initSchema() {
       UNIQUE(task_id, date)
     );
 
+    -- ═══ SHIFT TEMPLATES (reusable shift definitions) ═══
+    CREATE TABLE IF NOT EXISTS shift_templates (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,                    -- e.g. 'Früh', 'Spät', 'Nacht'
+      start_time  TEXT NOT NULL,                    -- e.g. '03:00'
+      end_time    TEXT NOT NULL,                    -- e.g. '12:00'
+      color       TEXT DEFAULT '#CC6CE7',
+      active      INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ═══ SHIFTS (assigned shifts per user per day) ═══
+    CREATE TABLE IF NOT EXISTS shifts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      date        TEXT NOT NULL,                    -- YYYY-MM-DD
+      template_id INTEGER REFERENCES shift_templates(id),
+      start_time  TEXT NOT NULL,                    -- '03:00'
+      end_time    TEXT NOT NULL,                    -- '12:00'
+      break_min   INTEGER NOT NULL DEFAULT 0,      -- break in minutes
+      note        TEXT,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- ═══ INDEXES ═══
     CREATE INDEX IF NOT EXISTS idx_bookings_company ON bookings(company_id);
     CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(scraped_date);
@@ -181,6 +207,8 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_bookings_plate ON bookings(plate);
     CREATE INDEX IF NOT EXISTS idx_bookings_external ON bookings(external_id);
     CREATE INDEX IF NOT EXISTS idx_log_booking ON booking_log(booking_id);
+    CREATE INDEX IF NOT EXISTS idx_shifts_user ON shifts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
   `);
 
   console.log('[DB] Schema initialized');
@@ -228,6 +256,17 @@ function seedDefaults() {
   );
 
   console.log('[DB] Companies seeded');
+
+  // Default shift templates
+  const existingTemplates = d.prepare('SELECT COUNT(*) as c FROM shift_templates').get();
+  if (existingTemplates.c === 0) {
+    const insertTpl = d.prepare('INSERT INTO shift_templates (name, start_time, end_time, color) VALUES (?, ?, ?, ?)');
+    insertTpl.run('Früh', '03:00', '12:00', '#22c55e');
+    insertTpl.run('Mittel', '08:00', '17:00', '#3b82f6');
+    insertTpl.run('Spät', '15:00', '00:00', '#f59e0b');
+    insertTpl.run('Lang', '03:00', '00:00', '#CC6CE7');
+    console.log('[DB] Default shift templates created');
+  }
 }
 
 // ─── Booking helpers ────────────────────────────────────────────────────
