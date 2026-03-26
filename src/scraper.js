@@ -230,6 +230,12 @@ async function scrapeCompany(companyId) {
 
 // ─── Scrape YEAR VIEW (one-time full import) ────────────────────────────
 
+// Year view URLs with correct filter params
+const YEAR_VIEW_URLS = {
+  parkking: '/#view=reservations.year&filters=JTdCJTIyZGF0ZVJhbmdlRmllbGQlMjIlM0ElMjJhcnJpdmFsRGF0ZSUyMiU3RA%3D%3D',
+  psfmsf: '/#view=reservations.year&filters=JTdCJTIyZGF0ZVJhbmdlRmllbGQlMjIlM0ElMjJhcnJpdmFsRGF0ZSUyMiU3RA%3D%3D'
+};
+
 async function scrapeYearView(companyId) {
   const d = getDb();
   const company = d.prepare('SELECT * FROM companies WHERE id = ? AND active = 1').get(companyId);
@@ -282,12 +288,13 @@ async function scrapeYearView(companyId) {
       await new Promise(r => setTimeout(r, 5000));
     }
 
-    // Navigate to year/reservations view
-    console.log(`[YearScraper][${company.name}] Year view...`);
-    await page.goto(company.base_url + '/#view=reservations.year', { waitUntil: 'networkidle2', timeout: 30000 });
+    // Navigate to year/reservations view with correct filter URL
+    const yearPath = YEAR_VIEW_URLS[companyId] || '/#view=reservations.year&filters=JTdCJTIyZGF0ZVJhbmdlRmllbGQlMjIlM0ElMjJhcnJpdmFsRGF0ZSUyMiU3RA%3D%3D';
+    console.log(`[YearScraper][${company.name}] Year view: ${yearPath}`);
+    await page.goto(company.base_url + yearPath, { waitUntil: 'networkidle2', timeout: 45000 });
     await new Promise(r => setTimeout(r, 8000));
 
-    // Wait for data rows to load
+    // Wait for initial data rows
     let retries = 0, rowCount = 0;
     while (retries < 15) {
       rowCount = await page.evaluate(() => document.querySelectorAll('tr[data-uid]').length);
@@ -296,32 +303,110 @@ async function scrapeYearView(companyId) {
       retries++;
     }
 
-    console.log(`[YearScraper][${company.name}] Found ${rowCount} rows, extracting...`);
+    console.log(`[YearScraper][${company.name}] Initial rows: ${rowCount}, scrolling to load all...`);
+
+    // Scroll down repeatedly to load ALL rows (ParkingPro uses virtual scrolling / lazy loading)
+    let previousCount = 0;
+    let stableRounds = 0;
+    for (let scrollAttempt = 0; scrollAttempt < 100; scrollAttempt++) {
+      // Scroll the grid/table container to bottom
+      await page.evaluate(() => {
+        // Try different scroll containers that ParkingPro might use
+        const containers = [
+          document.querySelector('.k-grid-content'),
+          document.querySelector('.k-virtual-scrollable-wrap'),
+          document.querySelector('.entity-list .k-grid .k-grid-content'),
+          document.querySelector('[data-role="grid"] .k-grid-content'),
+          document.querySelector('.k-scrollbar'),
+        ].filter(Boolean);
+        
+        if (containers.length > 0) {
+          for (const c of containers) {
+            c.scrollTop = c.scrollHeight;
+          }
+        } else {
+          // Fallback: scroll the page itself
+          window.scrollTo(0, document.body.scrollHeight);
+        }
+      });
+
+      await new Promise(r => setTimeout(r, 2000));
+
+      const currentCount = await page.evaluate(() => document.querySelectorAll('tr[data-uid]').length);
+      console.log(`[YearScraper][${company.name}] Scroll ${scrollAttempt + 1}: ${currentCount} rows`);
+
+      if (currentCount === previousCount) {
+        stableRounds++;
+        if (stableRounds >= 5) {
+          console.log(`[YearScraper][${company.name}] No more rows loading, stopping scroll.`);
+          break;
+        }
+      } else {
+        stableRounds = 0;
+      }
+      previousCount = currentCount;
+    }
+
+    rowCount = await page.evaluate(() => document.querySelectorAll('tr[data-uid]').length);
+    console.log(`[YearScraper][${company.name}] Final row count: ${rowCount}, extracting...`);
 
     // Extract ALL bookings from year view
     const rawBookings = await page.evaluate(() => {
       const rows = document.querySelectorAll('tr[data-uid]');
       const results = [];
       for (const row of rows) {
+        const cells = row.querySelectorAll('td');
         const getField = (field) => {
           const cell = row.querySelector(`td[data-field="${field}"]`);
           return cell ? (cell.textContent || '').trim() : '';
         };
-        const name = getField('fullName()').replace(/^ParkKing:\s*/i, '').trim();
-        const kennzeichen = getField('car.licensePlate');
-        const parkdatum = getField('arrivalDate') || getField('dayView.arrivalDate');
-        const rueckgabe = getField('departureDate') || getField('dayView.departureDate');
-        const personen = getField('numberOfPersons');
-        const tage = getField('parkedDaysCount()');
-        const flug = getField('flightNumber') || getField('dayView.flightNumber');
-        const telefon = getField('contactInformation.phone');
-        const fahrzeug = getField('car.description');
-        const code = getField('reservationCode');
-        const uid = row.getAttribute('data-uid');
-        const status = getField('status') || getField('reservationStatus');
+        // Also try reading by cell index as fallback (year view may have different data-field names)
+        const getCellText = (idx) => {
+          return cells[idx] ? (cells[idx].textContent || '').trim() : '';
+        };
 
-        if (kennzeichen || name) {
-          results.push({ name, kennzeichen, parkdatum, rueckgabe, personen, tage, flug, telefon, fahrzeug, code, uid, status });
+        const name = getField('fullName()') || getField('customer.fullName()') || '';
+        const cleanName = name.replace(/^ParkKing:\s*/i, '').trim();
+        const kennzeichen = getField('car.licensePlate') || getField('licensePlate') || '';
+        
+        // Year view shows full datetime like "15.03.2026 11:00"
+        const arrivalRaw = getField('arrivalDate') || getField('dayView.arrivalDate') || '';
+        const departureRaw = getField('departureDate') || getField('dayView.departureDate') || '';
+        
+        // Parse arrival: "15.03.2026 11:00" -> parkdatum="15.03.2026", zeit="11:00"
+        let parkdatum = arrivalRaw;
+        let zeit = '';
+        const arrParts = arrivalRaw.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
+        if (arrParts) {
+          parkdatum = arrParts[1];
+          zeit = arrParts[2];
+        }
+        
+        // Parse departure
+        let rueckgabe = departureRaw;
+        let rueckgabeZeit = '';
+        const depParts = departureRaw.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
+        if (depParts) {
+          rueckgabe = depParts[1];
+          rueckgabeZeit = depParts[2];
+        }
+
+        const personen = getField('numberOfPersons') || '';
+        const tage = getField('parkedDaysCount()') || getField('numberOfDays') || '';
+        const flug = getField('flightNumber') || getField('dayView.flightNumber') || getField('arrivalFlightNumber') || '';
+        const flugRueck = getField('departureFlightNumber') || '';
+        const telefon = getField('contactInformation.phone') || getField('phone') || '';
+        const fahrzeug = getField('car.description') || getField('carDescription') || '';
+        const code = getField('reservationCode') || '';
+        const uid = row.getAttribute('data-uid');
+
+        if (kennzeichen || cleanName) {
+          results.push({
+            name: cleanName, kennzeichen, parkdatum, rueckgabe,
+            zeit, rueckgabeZeit,
+            personen, tage, flug, flugRueck, telefon, fahrzeug, code, uid,
+            type: 'checkin'
+          });
         }
       }
       return results;
@@ -335,22 +420,35 @@ async function scrapeYearView(companyId) {
       // Parse the parkdatum to get a proper date for scraped_date
       let scrapedDate = null;
       if (b.parkdatum) {
-        // Try various date formats: DD.MM.YYYY, DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY
+        // Try DD.MM.YYYY HH:MM or DD.MM.YYYY
         const parts = b.parkdatum.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
         if (parts) {
           const day = parts[1].padStart(2, '0');
           const month = parts[2].padStart(2, '0');
           const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
           scrapedDate = `${year}-${month}-${day}`;
-        } else if (b.parkdatum.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          scrapedDate = b.parkdatum;
+        } else if (b.parkdatum.match(/^\d{4}-\d{2}-\d{2}/)) {
+          scrapedDate = b.parkdatum.substring(0, 10);
         }
       }
       if (!scrapedDate) scrapedDate = new Date().toISOString().split('T')[0];
 
+      // Also parse rueckgabe date
+      let rueckgabeDatum = null;
+      if (b.rueckgabe) {
+        const parts = b.rueckgabe.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
+        if (parts) {
+          const day = parts[1].padStart(2, '0');
+          const month = parts[2].padStart(2, '0');
+          const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
+          rueckgabeDatum = `${year}-${month}-${day}`;
+        }
+      }
+
       const bookingData = {
         ...b,
-        zeit: null,
+        rueckgabeDatum: rueckgabeDatum || b.rueckgabe,
+        rueckgabeZeit: b.rueckgabeZeit || null,
         type: 'checkin',
       };
 

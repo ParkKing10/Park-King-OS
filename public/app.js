@@ -7,6 +7,7 @@ let allBookings=[],allTasks=[],openEditorIdx=-1,printedIds=JSON.parse(localStora
 let scheduleWeekOffset=0,shiftTemplates=[],allUsers=[];
 let isOffline = !navigator.onLine;
 let syncInProgress = false;
+let currentBookingDate = new Date().toISOString().split('T')[0];
 
 // ─── Service Worker Registration ────────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -228,19 +229,42 @@ function showToast(m){const t=document.getElementById('toast');t.textContent=m;t
 
 function selectCompany(id){currentCompany=id;localStorage.setItem('pp_company',id);document.querySelectorAll('.company-btn').forEach(b=>b.classList.remove('active'));document.getElementById('btn-'+id).classList.add('active');loadBookings(false);}
 
+// ─── Date navigation ─────────────────────────────────────────────────
+function updateDatePicker(){
+  const picker=document.getElementById('bookingDatePicker');
+  if(picker) picker.value=currentBookingDate;
+}
+function goToday(){
+  currentBookingDate=new Date().toISOString().split('T')[0];
+  updateDatePicker();
+  loadBookings(false);
+}
+function goToDate(dateStr){
+  if(dateStr){currentBookingDate=dateStr;loadBookings(false);}
+}
+function goDateOffset(offset){
+  const d=new Date(currentBookingDate+'T12:00:00');
+  d.setDate(d.getDate()+offset);
+  currentBookingDate=d.toISOString().split('T')[0];
+  updateDatePicker();
+  loadBookings(false);
+}
+
 async function loadBookings(refresh){
   const list=document.getElementById('bookingList'),ld=document.getElementById('loadingState'),er=document.getElementById('errorState');
   list.innerHTML='';ld.style.display='flex';er.style.display='none';document.getElementById('searchInput').value='';document.getElementById('statusBar').innerHTML='';openEditorIdx=-1;
 
+  const dateStr=currentBookingDate;
+  updateDatePicker();
   const today=new Date().toISOString().split('T')[0];
 
-  // Try scrape first if refresh requested and online
-  if(refresh && !isOffline){
+  // Try scrape first if refresh requested and online and looking at today
+  if(refresh && !isOffline && dateStr===today){
     try{await fetch('/api/scrape',{method:'POST',headers:ah(),body:JSON.stringify({company:currentCompany})});}catch(e){}
   }
 
   try{
-    const r=await fetch('/api/bookings?company='+currentCompany+'&date='+today,{headers:ah()});
+    const r=await fetch('/api/bookings?company='+currentCompany+'&date='+dateStr,{headers:ah()});
 
     // Check if offline response from SW
     const isOfflineResp = r.headers && r.headers.get('X-Offline') === 'true';
@@ -249,13 +273,13 @@ async function loadBookings(refresh){
 
     if(isOfflineResp) {
       // Serve from IndexedDB cache
-      const cached = await OfflineStore.getCachedBookings(currentCompany, today);
+      const cached = await OfflineStore.getCachedBookings(currentCompany, dateStr);
       if(cached) {
         allBookings = cached.bookings || [];
         ld.style.display='none';
         const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
         const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
-        document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${today}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Offline</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
+        document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateStr}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Offline</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
         if(!allBookings.length){er.textContent='Keine gecachten Buchungen.';er.style.display='block';return;}
         renderBookings(allBookings);
         showToast('Offline-Daten geladen');
@@ -274,22 +298,23 @@ async function loadBookings(refresh){
     ld.style.display='none';
 
     // ★ Cache for offline use
-    await OfflineStore.cacheBookings(currentCompany, today, d);
+    await OfflineStore.cacheBookings(currentCompany, dateStr, d);
 
     const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
     const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
-    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${d.date||today}</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
-    if(!allBookings.length){er.textContent='Keine Buchungen für heute.';er.style.display='block';return;}
+    const dateLabel=dateStr===today?dateStr:formatDateLabel(dateStr);
+    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateLabel}</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
+    if(!allBookings.length){er.textContent='Keine Buchungen für '+dateLabel+'.';er.style.display='block';return;}
     renderBookings(allBookings);showToast(allBookings.length+' Buchungen geladen ✓');
   }catch(e){
     // Network error fallback
-    const cached = await OfflineStore.getCachedBookings(currentCompany, today);
+    const cached = await OfflineStore.getCachedBookings(currentCompany, dateStr);
     ld.style.display='none';
     if(cached && cached.bookings && cached.bookings.length) {
       allBookings = cached.bookings;
       const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
       const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
-      document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${today}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Cache</div><div class="status-chip chip-green">▶ ${ins}</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs}</div>`:''}`;
+      document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateStr}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Cache</div><div class="status-chip chip-green">▶ ${ins}</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs}</div>`:''}`;
       renderBookings(allBookings);
       showToast('Offline-Cache geladen');
     } else {
@@ -298,6 +323,8 @@ async function loadBookings(refresh){
     }
   }
 }
+
+function formatDateLabel(d){const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
 
 function filterBookings(){const q=document.getElementById('searchInput').value.trim().toLowerCase();const f=q?allBookings.filter(b=>(b.plate||'').toLowerCase().includes(q)||(b.name||'').toLowerCase().includes(q)):allBookings;renderBookings(f);}
 function markPrinted(idx){const b=allBookings[idx];if(b&&b.id){printedIds[b.id]=true;localStorage.setItem('pp_printed',JSON.stringify(printedIds));}}
