@@ -4,9 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#CC6CE7">
 <title>Park King OS</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23CC6CE7'/><text x='16' y='23' font-size='20' font-weight='bold' text-anchor='middle' fill='%23fff'>P</text></svg>">
+<script src="/offline-store.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -216,6 +220,21 @@
   .lightbox img{max-width:100%;max-height:90vh;border-radius:8px;object-fit:contain}
   .lightbox-info{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:12px;background:rgba(0,0,0,0.6);padding:6px 14px;border-radius:8px;white-space:nowrap}
 
+  /* ─── OFFLINE STATUS ─── */
+  .offline-bar{position:fixed;top:0;left:0;right:0;z-index:300;padding:6px 16px;font-size:12px;font-weight:700;text-align:center;transition:transform .3s,opacity .3s;transform:translateY(-100%);opacity:0}
+  .offline-bar.show{transform:translateY(0);opacity:1}
+  .offline-bar.offline{background:#ef4444;color:#fff}
+  .offline-bar.syncing{background:#f59e0b;color:#fff}
+  .offline-bar.synced{background:#22c55e;color:#fff}
+  .offline-bar + .header{transition:margin-top .3s}
+  .offline-bar.show + .header{margin-top:30px}
+  .sync-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;position:absolute;top:-4px;right:-4px}
+  .header-btn{position:relative}
+  .offline-indicator{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+  .offline-indicator.online{background:#22c55e}
+  .offline-indicator.offline{background:#ef4444;animation:pulse-dot 1.5s infinite}
+  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.4}}
+
   /* ─── MISC ─── */
   .loading{display:flex;flex-direction:column;align-items:center;padding:60px 20px;gap:16px}
   .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
@@ -246,9 +265,11 @@
 </div>
 
 <div class="app" id="app">
+  <div class="offline-bar" id="offlineBar">📴 Offline-Modus — Änderungen werden beim Verbinden synchronisiert</div>
   <div class="header">
-    <div class="header-icon">P</div><h1>Park King OS<span>v1</span></h1>
+    <div class="header-icon">P</div><h1>Park King OS<span>v1 <span class="offline-indicator online" id="connDot"></span></span></h1>
     <div class="header-right">
+      <button class="header-btn" id="syncBtn" onclick="manualSync()" title="Synchronisieren" style="display:none">⟳ <span id="syncCount"></span></button>
       <button class="header-btn" onclick="loadBookings(true)">↻</button>
       <button class="header-btn" onclick="doLogout()">Logout</button>
     </div>
@@ -361,418 +382,6 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script>
-let authToken=localStorage.getItem('pp_token')||'',currentUser=null,currentCompany=localStorage.getItem('pp_company')||'parkking';
-let allBookings=[],allTasks=[],openEditorIdx=-1,printedIds=JSON.parse(localStorage.getItem('pp_printed')||'{}');
-let scheduleWeekOffset=0,shiftTemplates=[],allUsers=[];
-
-if(authToken){initApp();}else{document.getElementById('loginScreen').style.display='flex';}
-document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-document.getElementById('loginUser').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
-
-function ah(){return{'Authorization':'Bearer '+authToken,'Content-Type':'application/json'};}
-
-async function doLogin(){
-  const u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value.trim();
-  if(!u||!p)return;
-  try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});const d=await r.json();if(d.token){authToken=d.token;currentUser=d.user;localStorage.setItem('pp_token',authToken);initApp();}else showErr(d.error||'Ungültige Zugangsdaten');}catch(e){showErr('Verbindungsfehler');}
-}
-
-function doLogout(){authToken='';currentUser=null;localStorage.removeItem('pp_token');document.getElementById('app').classList.remove('active');document.body.classList.remove('is-admin');document.getElementById('loginScreen').style.display='flex';}
-
-async function initApp(){
-  document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('active');
-  try{const r=await fetch('/api/auth/me',{headers:ah()});if(r.status===401){doLogout();return;}const d=await r.json();currentUser=d.user;if(currentUser.role==='admin')document.body.classList.add('is-admin');else document.body.classList.remove('is-admin');}catch(e){doLogout();return;}
-  // Preload templates and users for schedule
-  try{const[tR,uR]=await Promise.all([fetch('/api/shift-templates',{headers:ah()}),fetch('/api/users',{headers:ah()}).catch(()=>({json:async()=>[]}))]);shiftTemplates=await tR.json();try{allUsers=await uR.json();}catch(e){allUsers=[];}}catch(e){}
-  selectCompany(currentCompany);
-}
-
-function showErr(m){const e=document.getElementById('loginError');e.textContent=m;e.style.display='block';setTimeout(()=>e.style.display='none',3000);}
-
-function switchTab(tab){
-  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  if(tab==='bookings'){document.getElementById('tabBookings').classList.add('active');document.getElementById('navBookings').classList.add('active');}
-  else if(tab==='tasks'){document.getElementById('tabTasks').classList.add('active');document.getElementById('navTasks').classList.add('active');loadTasks();}
-  else if(tab==='schedule'){document.getElementById('tabSchedule').classList.add('active');document.getElementById('navSchedule').classList.add('active');loadSchedule();}
-  else if(tab==='damages'){document.getElementById('tabDamages').classList.add('active');document.getElementById('navDamages').classList.add('active');loadDamages();}
-  else if(tab==='admin'){document.getElementById('tabAdmin').classList.add('active');document.getElementById('navAdmin').classList.add('active');loadAdminData();}
-}
-
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
-
-// ═══ BOOKINGS ═══
-function selectCompany(id){currentCompany=id;localStorage.setItem('pp_company',id);document.querySelectorAll('.company-btn').forEach(b=>b.classList.remove('active'));document.getElementById('btn-'+id).classList.add('active');loadBookings(false);}
-
-async function loadBookings(refresh){
-  const list=document.getElementById('bookingList'),ld=document.getElementById('loadingState'),er=document.getElementById('errorState');
-  list.innerHTML='';ld.style.display='flex';er.style.display='none';document.getElementById('searchInput').value='';document.getElementById('statusBar').innerHTML='';openEditorIdx=-1;
-  if(refresh){try{await fetch('/api/scrape',{method:'POST',headers:ah(),body:JSON.stringify({company:currentCompany})});}catch(e){}}
-  try{
-    const today=new Date().toISOString().split('T')[0];const r=await fetch('/api/bookings?company='+currentCompany+'&date='+today,{headers:ah()});if(r.status===401){doLogout();return;}
-    const d=await r.json();if(d.error)throw new Error(d.error);allBookings=d.bookings||[];ld.style.display='none';
-    const cn=currentCompany==='parkking'?'Biemann':'Hasloh';const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
-    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${d.date||today}</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
-    if(!allBookings.length){er.textContent='Keine Buchungen für heute.';er.style.display='block';return;}
-    renderBookings(allBookings);showToast(allBookings.length+' Buchungen geladen ✓');
-  }catch(e){ld.style.display='none';er.innerHTML=`<div style="margin-bottom:8px">⚠️ ${e.message}</div><button class="btn btn-accent btn-sm" onclick="loadBookings(true)">Nochmal</button>`;er.style.display='block';}
-}
-
-function filterBookings(){const q=document.getElementById('searchInput').value.trim().toLowerCase();const f=q?allBookings.filter(b=>(b.plate||'').toLowerCase().includes(q)||(b.name||'').toLowerCase().includes(q)):allBookings;renderBookings(f);}
-function markPrinted(idx){const b=allBookings[idx];if(b&&b.id){printedIds[b.id]=true;localStorage.setItem('pp_printed',JSON.stringify(printedIds));}}
-
-function renderBookings(list){
-  const el=document.getElementById('bookingList');if(!list.length){el.innerHTML='<div class="empty">Keine Treffer.</div>';return;}
-  const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
-  el.innerHTML=list.map((b,i)=>{const idx=allBookings.indexOf(b);const isIn=b.type==='in';const ret=(b.date_out||'')+(b.time_out?' '+b.time_out:'');const time=b.time_in||b.time_out||'';const flight=b.flight_code&&b.flight_code!=='TO BE UPDATED'?b.flight_code:'';const printed=printedIds[b.id];
-  return`<div class="bcard" style="animation-delay:${Math.min(i,15)*0.03+0.05}s"><div class="bcard-row" onclick="toggleEditor(${idx})"><div class="bcard-stripe ${isIn?'in':'out'}">${flight?`<div class="sf">✈${esc(flight)}</div>`:''}<div class="st">${esc(time)||'—'}</div></div><div class="bcard-body"><div class="bcard-top"><span class="bcard-badge pk">${cn}</span><span>${printed?'<span class="bcard-printed">🖨 gedruckt</span>':''}${b.status==='checked'?'<span style="color:var(--green);font-size:16px;margin-left:4px">✓</span>':''}</span></div><div class="bcard-plate">${esc(b.plate)||'—'} ${b.external_id?'<span style="color:var(--text3);font-size:12px;font-weight:400">#'+esc(b.external_id)+'</span>':''}</div><div class="bcard-name">${esc(b.name)||'—'}</div><div class="bcard-meta">${ret?`<span>↩ <strong>${esc(ret)}</strong></span>`:''}${b.car?`<span>🚗 ${esc(b.car)}</span>`:''}${b.pax?`<span>👤 ${b.pax}</span>`:''}</div></div></div><div class="bcard-editor" id="editor-${idx}"><div class="ed-row"><div class="ed-col"><div class="ed-label">Kundenname</div><input class="ed-input" id="en-${idx}" value="${esc(b.name)}" oninput="rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Rückgabe Datum</div><input class="ed-input" id="ed-${idx}" value="${esc(b.date_out)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Uhrzeit</div><input class="ed-input" id="et-${idx}" value="${esc(b.time_out)}" oninput="rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Fahrzeug</div><input class="ed-input" id="ec-${idx}" value="${esc(b.car)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Kennzeichen</div><input class="ed-input plate" id="ep-${idx}" value="${esc(b.plate)}" oninput="this.value=this.value.toUpperCase();rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Stellplatz (optional)</div><input class="ed-input" id="es-${idx}" placeholder="z.B. Straße rechts, Reihe 3..." oninput="rl(${idx})"></div></div><div class="label-preview"><canvas id="cv-${idx}"></canvas></div><div class="ed-btns"><button class="btn btn-accent btn-sm" onclick="printL(${idx})">🖨 Drucken</button><button class="btn btn-white btn-sm" onclick="downloadL(${idx})">📲 Speichern</button><button class="btn btn-outline btn-sm" onclick="shareL(${idx})">↗ Teilen</button><button class="btn btn-ghost btn-sm" onclick="saveClose(${idx})">✓ Fertig</button></div></div></div>`;}).join('');
-  if(openEditorIdx>=0){const ed=document.getElementById('editor-'+openEditorIdx);if(ed){ed.classList.add('open');rl(openEditorIdx);}}
-}
-
-function toggleEditor(idx){if(openEditorIdx===idx){saveClose(idx);return;}if(openEditorIdx>=0){const p=document.getElementById('editor-'+openEditorIdx);if(p)p.classList.remove('open');}openEditorIdx=idx;const ed=document.getElementById('editor-'+idx);if(ed){ed.classList.add('open');rl(idx);}}
-
-async function saveClose(idx){const b=allBookings[idx];if(b&&b.id){const u={name:document.getElementById('en-'+idx).value.trim(),plate:document.getElementById('ep-'+idx).value.trim().toUpperCase(),car:document.getElementById('ec-'+idx).value.trim(),date_out:document.getElementById('ed-'+idx).value.trim(),time_out:document.getElementById('et-'+idx).value.trim(),comment:document.getElementById('es-'+idx).value.trim()};try{await fetch('/api/bookings/'+b.id,{method:'PUT',headers:ah(),body:JSON.stringify(u)});Object.assign(allBookings[idx],u);}catch(e){}}openEditorIdx=-1;const ed=document.getElementById('editor-'+idx);if(ed)ed.classList.remove('open');filterBookings();}
-
-function rl(idx){const name=(document.getElementById('en-'+idx)?.value||'').trim(),retDate=(document.getElementById('ed-'+idx)?.value||'').trim(),retTime=(document.getElementById('et-'+idx)?.value||'').trim(),car=(document.getElementById('ec-'+idx)?.value||'').trim(),plate=(document.getElementById('ep-'+idx)?.value||'').trim().toUpperCase(),spot=(document.getElementById('es-'+idx)?.value||'').trim(),cn=currentCompany==='parkking'?'Biemann':'Hasloh';
-const W=673,H=378,cv=document.getElementById('cv-'+idx);if(!cv)return;
-cv.width=W;cv.height=H;cv.style.width='100%';cv.style.maxWidth='300px';cv.style.height='auto';
-const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';c.textAlign='center';
-// Measure all elements first — bigger sizes for name, plate, company
-let f1=32;c.font=`700 ${f1}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(name||'—').width>W-10&&f1>14){f1-=2;c.font=`700 ${f1}px "Helvetica Neue",Arial,sans-serif`;}
-let fp=44;c.font=`900 ${fp}px "JetBrains Mono",monospace`;while(c.measureText(plate||'—').width>W-10&&fp>20){fp-=2;c.font=`900 ${fp}px "JetBrains Mono",monospace`;}
-let f2=96;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retDate||'—').width>W-8&&f2>40){f2-=4;c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;}
-let f3=76;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(retTime||'—').width>W-8&&f3>30){f3-=4;c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;}
-let fs=spot?24:0;if(spot){c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(spot).width>W-10&&fs>12){fs-=2;c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;}}
-let fb=28;const botLine=cn+(car?' · '+car:'');c.font=`800 ${fb}px "Helvetica Neue",Arial,sans-serif`;while(c.measureText(botLine).width>W-10&&fb>12){fb-=2;c.font=`800 ${fb}px "Helvetica Neue",Arial,sans-serif`;}
-// Calculate total content height with tight gaps
-const gap=2;const totalH=f1+gap+fp+gap+f2+gap+f3+(spot?gap+fs:0)+gap+fb;
-let y=Math.max(4,Math.floor((H-totalH)/2));
-// Draw vertically centered
-c.textBaseline='top';
-c.font=`700 ${f1}px "Helvetica Neue",Arial,sans-serif`;c.fillText(name||'—',W/2,y);y+=f1+gap;
-c.font=`900 ${fp}px "JetBrains Mono",monospace`;c.fillText(plate||'—',W/2,y);y+=fp+gap;
-c.font=`900 ${f2}px "Helvetica Neue",Arial,sans-serif`;c.fillText(retDate||'—',W/2,y);y+=f2+gap;
-c.font=`900 ${f3}px "Helvetica Neue",Arial,sans-serif`;c.fillText(retTime||'—',W/2,y);y+=f3+gap;
-if(spot){c.font=`800 ${fs}px "Helvetica Neue",Arial,sans-serif`;c.fillText(spot,W/2,y);y+=fs+gap;}
-c.fillStyle='#333';c.font=`800 ${fb}px "Helvetica Neue",Arial,sans-serif`;c.fillText(botLine,W/2,y);
-c.textAlign='left';}
-
-function gc(i){return document.getElementById('cv-'+i);}
-function printL(i){const cv=gc(i);if(!cv)return;markPrinted(i);filterBookings();
-// Rotate canvas 90° CW for portrait printing (32mm wide × 57mm tall)
-const rc=document.createElement('canvas');rc.width=cv.height;rc.height=cv.width;const rx=rc.getContext('2d');rx.translate(rc.width/2,rc.height/2);rx.rotate(Math.PI/2);rx.drawImage(cv,-cv.width/2,-cv.height/2);
-// Convert to blob and trigger download — user prints from Photos app (no Safari header/footer)
-rc.toBlob(blob=>{
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');
-  const p=(document.getElementById('ep-'+i)?.value||'label').trim().toUpperCase().replace(/[\s\.]/g,'-');
-  a.download=`label-${p}.png`;a.href=url;a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),5000);
-  showToast('Label gespeichert → aus Fotos drucken ✓');
-},'image/png');}
-function downloadL(i){const cv=gc(i);if(!cv)return;
-const rc=document.createElement('canvas');rc.width=cv.height;rc.height=cv.width;const rx=rc.getContext('2d');rx.translate(rc.width/2,rc.height/2);rx.rotate(Math.PI/2);rx.drawImage(cv,-cv.width/2,-cv.height/2);
-const p=(document.getElementById('ep-'+i)?.value||'label').trim().toUpperCase().replace(/[\s\.]/g,'-');const a=document.createElement('a');a.download=`label-${p}.png`;a.href=rc.toDataURL('image/png');a.click();showToast('Gespeichert ✓');}
-async function shareL(i){const cv=gc(i);if(!cv)return;try{
-const rc=document.createElement('canvas');rc.width=cv.height;rc.height=cv.width;const rx=rc.getContext('2d');rx.translate(rc.width/2,rc.height/2);rx.rotate(Math.PI/2);rx.drawImage(cv,-cv.width/2,-cv.height/2);
-const b=await new Promise(r=>rc.toBlob(r,'image/png'));const f=new File([b],'label.png',{type:'image/png'});if(navigator.canShare?.({files:[f]})){await navigator.share({files:[f],title:'Label'});}else{downloadL(i);}}catch(e){downloadL(i);}}
-
-// ═══ TASKS ═══
-async function loadTasks(){
-  const today=new Date().toISOString().split('T')[0];document.getElementById('tasksDate').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
-  document.getElementById('taskLoading').style.display='flex';document.getElementById('taskList').innerHTML='';
-  try{const r=await fetch('/api/tasks?date='+today,{headers:ah()});if(r.status===401){doLogout();return;}const d=await r.json();allTasks=d.tasks||[];document.getElementById('taskLoading').style.display='none';renderTasks();}catch(e){document.getElementById('taskLoading').style.display='none';document.getElementById('taskList').innerHTML='<div class="task-empty">⚠️ Fehler beim Laden</div>';}
-}
-
-function renderTasks(){
-  const el=document.getElementById('taskList'),prog=document.getElementById('tasksProgress');
-  if(!allTasks.length){el.innerHTML='<div class="task-empty">Keine Aufgaben definiert.<br>Ein Admin kann Aufgaben im Admin-Panel anlegen.</div>';prog.style.display='none';return;}
-  const done=allTasks.filter(t=>t.completed_by_id).length,total=allTasks.length,pct=Math.round((done/total)*100);
-  prog.style.display='flex';document.getElementById('progressFill').style.width=pct+'%';document.getElementById('progressText').textContent=`${done}/${total}`;
-  el.innerHTML=allTasks.map((t,i)=>{const isDone=!!t.completed_by_id;return`<div class="task-card ${isDone?'done':''}" style="animation-delay:${i*0.04+0.05}s" onclick="toggleTask(${t.id})"><div class="task-check">${isDone?'✓':''}</div><div class="task-info"><div class="task-title">${esc(t.title)}</div>${t.description?`<div class="task-desc">${esc(t.description)}</div>`:''}${isDone?`<div class="task-meta">✓ ${esc(t.completed_by_name)} · ${formatTime(t.completed_at)}</div>`:''}</div></div>`;}).join('');
-}
-
-async function toggleTask(taskId){try{const r=await fetch('/api/tasks/'+taskId+'/toggle',{method:'POST',headers:ah()});const d=await r.json();showToast(d.message);loadTasks();}catch(e){showToast('Fehler ⚠️');}}
-function formatTime(dt){if(!dt)return'';try{const d=new Date(dt+'Z');return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return'';}}
-
-// ═══ SCHEDULE ═══
-function getWeekDates(offset){
-  const now=new Date();now.setDate(now.getDate()+offset*7);
-  const day=now.getDay();const mondayOffset=day===0?-6:1-day;
-  const mon=new Date(now);mon.setDate(now.getDate()+mondayOffset);
-  const days=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);days.push(d);}
-  return days;
-}
-
-const DAY_NAMES=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
-
-function getKW(date){const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));const dayNum=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-dayNum);const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil(((d-yearStart)/86400000+1)/7);}
-
-async function loadSchedule(){
-  const days=getWeekDates(scheduleWeekOffset);const weekStart=days[0].toISOString().split('T')[0];
-  const kw=getKW(days[0]);
-  document.getElementById('weekLabel').innerHTML=`KW ${kw}<span>${days[0].toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – ${days[6].toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>`;
-  document.getElementById('scheduleLoading').style.display='flex';document.getElementById('scheduleGrid').innerHTML='';document.getElementById('hoursSummary').style.display='none';
-  try{
-    const r=await fetch('/api/shifts?date='+weekStart,{headers:ah()});if(r.status===401){doLogout();return;}
-    const data=await r.json();document.getElementById('scheduleLoading').style.display='none';
-    const today=new Date().toISOString().split('T')[0];const isAdmin=currentUser&&currentUser.role==='admin';
-    const grid=document.getElementById('scheduleGrid');
-    grid.innerHTML=days.map((day,di)=>{
-      const dateStr=day.toISOString().split('T')[0];const isToday=dateStr===today;
-      const dayShifts=(data.shifts||[]).filter(s=>s.date===dateStr);
-      return`<div class="day-row"><div class="day-header ${isToday?'today':''}"><span class="day-name">${DAY_NAMES[di]}</span><span class="day-date">${day.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span></div><div class="day-shifts">${dayShifts.length?dayShifts.map(s=>{
-        const color=s.template_color||'#CC6CE7';const hrs=calcHours(s.start_time,s.end_time,s.break_min);
-        return`<div class="shift-pill" style="background:${color}20;color:${color};border-left:3px solid ${color}"><span class="shift-time">${s.start_time}–${s.end_time}</span><span class="shift-user">${esc(s.user_name)}</span><span class="shift-hours">${hrs.toFixed(1)}h</span>${isAdmin?`<button class="shift-del" onclick="event.stopPropagation();deleteShift(${s.id})">✕</button>`:''}</div>`;
-      }).join(''):'<div class="day-empty">Keine Schichten</div>'}${isAdmin?`<button class="day-add" onclick="openModal('addShift',{date:'${dateStr}',dayName:'${DAY_NAMES[di]} ${day.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}'})">+ Schicht</button>`:''}</div></div>`;
-    }).join('');
-
-    // Hours summary
-    if(data.hoursByUser&&Object.keys(data.hoursByUser).length){
-      document.getElementById('hoursSummary').style.display='block';
-      document.getElementById('hoursRows').innerHTML=Object.values(data.hoursByUser).sort((a,b)=>b.hours-a.hours).map(u=>`<div class="hours-row"><span class="hours-user">${esc(u.name)} <span style="font-size:11px;color:var(--text3);font-weight:400">(${u.shifts} Schichten)</span></span><span class="hours-val">${u.hours.toFixed(1)} Std</span></div>`).join('');
-    }
-  }catch(e){document.getElementById('scheduleLoading').style.display='none';document.getElementById('scheduleGrid').innerHTML='<div class="task-empty">⚠️ Fehler beim Laden</div>';}
-}
-
-function changeWeek(dir){scheduleWeekOffset+=dir;loadSchedule();}
-function calcHours(s,e,brk){const[sh,sm]=s.split(':').map(Number),[eh,em]=e.split(':').map(Number);let st=sh*60+sm,en=eh*60+em;if(en<=st)en+=1440;return Math.max(0,(en-st-(brk||0))/60);}
-
-async function deleteShift(id){if(!confirm('Schicht löschen?'))return;try{await fetch('/api/shifts/'+id,{method:'DELETE',headers:ah()});showToast('Schicht gelöscht ✓');loadSchedule();}catch(e){showToast('Fehler ⚠️');}}
-
-// ═══ ADMIN ═══
-async function loadAdminData(){await Promise.all([loadUsers(),loadAdminTasks(),loadAdminTemplates(),loadMonthlyHours()]);}
-
-async function loadUsers(){try{const r=await fetch('/api/users',{headers:ah()});if(r.status===403)return;allUsers=await r.json();renderUsers(allUsers);}catch(e){}}
-
-function renderUsers(users){
-  document.getElementById('userList').innerHTML=users.map(u=>{const initials=(u.display_name||u.username).split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);const roleCls=u.role==='admin'?'role-admin':'role-staff';const roleLabel=u.role==='admin'?'Admin':'Mitarbeiter';
-  return`<div class="admin-card" ${!u.active?'style="opacity:0.5"':''}><div class="admin-card-row"><div class="admin-avatar">${initials}</div><div class="admin-card-info"><div class="admin-card-name">${esc(u.display_name)} ${!u.active?'<span class="role-badge role-inactive">Inaktiv</span>':''}</div><div class="admin-card-sub">@${esc(u.username)} · <span class="role-badge ${roleCls}">${roleLabel}</span></div></div></div>${currentUser&&u.id!==currentUser.id?`<div class="admin-actions"><button class="btn btn-white btn-xs" onclick="openEditUser(${u.id},${JSON.stringify(u.display_name).replace(/"/g,'&quot;')},${JSON.stringify(u.role).replace(/"/g,'&quot;')},${u.active})">Bearbeiten</button>${u.active?`<button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deactivateUser(${u.id},${JSON.stringify(u.display_name).replace(/"/g,'&quot;')})">Deaktivieren</button>`:`<button class="btn btn-xs" style="background:var(--green-bg);color:var(--green);border:none" onclick="reactivateUser(${u.id})">Aktivieren</button>`}</div>`:''}</div>`;}).join('');
-}
-
-async function loadAdminTasks(){try{const r=await fetch('/api/tasks',{headers:ah()});const d=await r.json();renderAdminTasks(d.tasks||[]);}catch(e){}}
-function renderAdminTasks(tasks){if(!tasks.length){document.getElementById('adminTaskList').innerHTML='<div class="task-empty">Noch keine Aufgaben.</div>';return;}document.getElementById('adminTaskList').innerHTML=tasks.map(t=>`<div class="admin-card"><div class="admin-card-row"><div class="admin-avatar" style="background:var(--orange-bg);color:var(--orange)">📋</div><div class="admin-card-info"><div class="admin-card-name">${esc(t.title)}</div>${t.description?`<div class="admin-card-sub">${esc(t.description)}</div>`:''}</div></div><div class="admin-actions"><button class="btn btn-white btn-xs" onclick="openEditTask(${t.id},${JSON.stringify(t.title).replace(/"/g,'&quot;')},${JSON.stringify(t.description||'').replace(/"/g,'&quot;')})">Bearbeiten</button><button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deleteTask(${t.id},${JSON.stringify(t.title).replace(/"/g,'&quot;')})">Entfernen</button></div></div>`).join('');}
-
-async function loadAdminTemplates(){try{const r=await fetch('/api/shift-templates',{headers:ah()});shiftTemplates=await r.json();renderAdminTemplates();}catch(e){}}
-function renderAdminTemplates(){if(!shiftTemplates.length){document.getElementById('adminTemplateList').innerHTML='<div class="task-empty">Keine Vorlagen.</div>';return;}document.getElementById('adminTemplateList').innerHTML=shiftTemplates.map(t=>`<div class="admin-card"><div class="admin-card-row"><div class="admin-avatar" style="background:${t.color}20;color:${t.color}">🕐</div><div class="admin-card-info"><div class="admin-card-name">${esc(t.name)}</div><div class="admin-card-sub">${t.start_time} – ${t.end_time} · ${calcHours(t.start_time,t.end_time,0).toFixed(1)} Std</div></div></div><div class="admin-actions"><button class="btn btn-xs" style="background:var(--red-bg);color:var(--red);border:none" onclick="deleteTemplate(${t.id})">Entfernen</button></div></div>`).join('');}
-
-async function loadMonthlyHours(){
-  const month=new Date().toISOString().slice(0,7);
-  try{const r=await fetch('/api/shifts/hours?month='+month,{headers:ah()});const d=await r.json();const entries=Object.values(d.summary||{});
-  if(!entries.length){document.getElementById('monthlyHours').innerHTML='<div class="task-empty">Keine Daten für diesen Monat.</div>';return;}
-  document.getElementById('monthlyHours').innerHTML=`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${new Date().toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</div>`+entries.sort((a,b)=>b.totalHours-a.totalHours).map(u=>`<div class="hours-row"><span class="hours-user">${esc(u.name)} <span style="font-size:11px;color:var(--text3);font-weight:400">${u.totalShifts} Schichten</span></span><span class="hours-val">${u.totalHours.toFixed(1)} Std</span></div>`).join('');
-  }catch(e){}
-}
-
-// ═══ MODALS ═══
-function openModal(type,data){
-  const overlay=document.getElementById('modalOverlay'),content=document.getElementById('modalContent');
-  if(type==='addUser'){content.innerHTML=`<div class="modal-title">Neuer Benutzer <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Anzeigename</label><input class="form-input" id="muName" placeholder="z.B. Max Mustermann"></div><div class="form-group"><label class="form-label">Benutzername</label><input class="form-input" id="muUsername" placeholder="z.B. max"></div><div class="form-group"><label class="form-label">Passwort</label><input class="form-input" id="muPassword" type="password" placeholder="Min. 6 Zeichen"></div><div class="form-group"><label class="form-label">Rolle</label><select class="form-input" id="muRole"><option value="staff">Mitarbeiter</option><option value="admin">Admin</option></select></div><button class="btn btn-accent btn-full" onclick="createUser()">Benutzer erstellen</button>`;}
-  else if(type==='addTask'){content.innerHTML=`<div class="modal-title">Neue Tagesaufgabe <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Titel</label><input class="form-input" id="mtTitle" placeholder="z.B. Parkplatz kontrollieren"></div><div class="form-group"><label class="form-label">Beschreibung (optional)</label><input class="form-input" id="mtDesc" placeholder="Details..."></div><button class="btn btn-accent btn-full" onclick="createTask()">Aufgabe erstellen</button>`;}
-  else if(type==='editUser'){content.innerHTML=`<div class="modal-title">Benutzer bearbeiten <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Anzeigename</label><input class="form-input" id="euName" value="${esc(data.name)}"></div><div class="form-group"><label class="form-label">Neues Passwort (leer = unverändert)</label><input class="form-input" id="euPassword" type="password"></div><div class="form-group"><label class="form-label">Rolle</label><select class="form-input" id="euRole"><option value="staff" ${data.role==='staff'?'selected':''}>Mitarbeiter</option><option value="admin" ${data.role==='admin'?'selected':''}>Admin</option></select></div><button class="btn btn-accent btn-full" onclick="updateUser(${data.id})">Speichern</button>`;}
-  else if(type==='editTask'){content.innerHTML=`<div class="modal-title">Aufgabe bearbeiten <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Titel</label><input class="form-input" id="etTitle" value="${esc(data.title)}"></div><div class="form-group"><label class="form-label">Beschreibung</label><input class="form-input" id="etDesc" value="${esc(data.description)}"></div><button class="btn btn-accent btn-full" onclick="updateTask(${data.id})">Speichern</button>`;}
-  else if(type==='addTemplate'){content.innerHTML=`<div class="modal-title">Neue Schichtvorlage <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Name</label><input class="form-input" id="stName" placeholder="z.B. Frühschicht"></div><div class="form-group"><label class="form-label">Startzeit</label><input class="form-input" id="stStart" type="time" value="03:00"></div><div class="form-group"><label class="form-label">Endzeit</label><input class="form-input" id="stEnd" type="time" value="12:00"></div><div class="form-group"><label class="form-label">Farbe</label><input type="color" id="stColor" value="#CC6CE7" style="width:100%;height:44px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer"></div><button class="btn btn-accent btn-full" onclick="createTemplate()">Vorlage erstellen</button>`;}
-  else if(type==='addShift'){
-    const activeUsers=(allUsers||[]).filter(u=>u.active);
-    const tplOptions=shiftTemplates.map(t=>`<option value="${t.id}" data-start="${t.start_time}" data-end="${t.end_time}">${t.name} (${t.start_time}–${t.end_time})</option>`).join('');
-    content.innerHTML=`<div class="modal-title">Schicht: ${data.dayName} <button class="modal-close" onclick="closeModal()">✕</button></div><div class="form-group"><label class="form-label">Mitarbeiter</label><select class="form-input" id="shUser">${activeUsers.map(u=>`<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Vorlage (optional)</label><select class="form-input" id="shTpl" onchange="applyTemplate()"><option value="">— Individuelle Zeit —</option>${tplOptions}</select></div><div class="form-group"><label class="form-label">Startzeit</label><input class="form-input" id="shStart" type="time" value="03:00"></div><div class="form-group"><label class="form-label">Endzeit</label><input class="form-input" id="shEnd" type="time" value="12:00"></div><div class="form-group"><label class="form-label">Pause (Minuten)</label><input class="form-input" id="shBreak" type="number" value="0" min="0" max="120"></div><div class="form-group"><label class="form-label">Notiz (optional)</label><input class="form-input" id="shNote" placeholder="z.B. Shuttle-Dienst"></div><input type="hidden" id="shDate" value="${data.date}"><button class="btn btn-accent btn-full" onclick="createShift()">Schicht eintragen</button>`;
-  }
-  else if(type==='addDamage'){
-    const now=new Date();const timeStr=now.toTimeString().slice(0,5);
-    content.innerHTML=`<div class="modal-title">Schaden protokollieren <button class="modal-close" onclick="closeModal()">✕</button></div>
-      <div class="form-group"><label class="form-label">Vorname *</label><input class="form-input" id="dmFirstName" placeholder="Vorname des Kunden"></div>
-      <div class="form-group"><label class="form-label">Nachname *</label><input class="form-input" id="dmLastName" placeholder="Nachname"></div>
-      <div class="form-group"><label class="form-label">Kennzeichen *</label><input class="form-input" id="dmPlate" placeholder="z.B. HH-AB 1234" style="text-transform:uppercase;font-family:'JetBrains Mono',monospace;font-weight:700" oninput="this.value=this.value.toUpperCase()"></div>
-      <div style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label class="form-label">Automarke</label><input class="form-input" id="dmBrand" placeholder="z.B. VW Golf"></div><div class="form-group" style="flex:1"><label class="form-label">Farbe</label><input class="form-input" id="dmColor" placeholder="z.B. Schwarz"></div></div>
-      <div class="form-group"><label class="form-label">Uhrzeit</label><input class="form-input" id="dmTime" type="time" value="${timeStr}"></div>
-      <div class="form-group"><label class="form-label">Beschreibung des Schadens *</label><textarea class="form-input" id="dmDesc" rows="4" placeholder="Was ist passiert? Wo ist der Schaden?" style="resize:vertical;font-family:'Outfit',sans-serif"></textarea></div>
-      <div class="form-group"><label class="form-label">Fotos (optional, können auch nachträglich hinzugefügt werden)</label>
-        <div class="dmg-upload-area" id="dmUploadArea" onclick="document.getElementById('dmPhotos').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault();this.classList.remove('dragover');handleDmgFiles(event.dataTransfer.files)">
-          <input type="file" id="dmPhotos" multiple accept="image/*" onchange="handleDmgFiles(this.files)">
-          <div class="dmg-upload-text">📸 <span>Fotos auswählen</span> oder hierher ziehen</div>
-        </div>
-        <div id="dmPhotoPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
-      </div>
-      <button class="btn btn-accent btn-full" onclick="createDamage()">Schaden protokollieren</button>`;
-  }
-  else if(type==='addPhotos'){
-    content.innerHTML=`<div class="modal-title">Fotos hinzufügen <button class="modal-close" onclick="closeModal()">✕</button></div>
-      <div class="form-group"><label class="form-label">Bezeichnung</label><select class="form-input" id="apLabel"><option value="front">Vorne</option><option value="back">Hinten</option><option value="left">Links</option><option value="right">Rechts</option><option value="detail">Detail</option><option value="other" selected>Sonstige</option></select></div>
-      <div class="dmg-upload-area" onclick="document.getElementById('apFiles').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="event.preventDefault();this.classList.remove('dragover');handleApFiles(event.dataTransfer.files)">
-        <input type="file" id="apFiles" multiple accept="image/*" onchange="handleApFiles(this.files)">
-        <div class="dmg-upload-text">📸 <span>Fotos auswählen</span></div>
-      </div>
-      <div id="apPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
-      <input type="hidden" id="apDamageId" value="${data.id}">
-      <button class="btn btn-accent btn-full" style="margin-top:12px" onclick="uploadMorePhotos()">Hochladen</button>`;
-  }
-  overlay.classList.add('open');
-}
-
-function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
-function applyTemplate(){const sel=document.getElementById('shTpl');const opt=sel.options[sel.selectedIndex];if(opt.dataset.start){document.getElementById('shStart').value=opt.dataset.start;document.getElementById('shEnd').value=opt.dataset.end;}}
-
-// ─── Action handlers ───
-async function createUser(){const name=document.getElementById('muName').value.trim(),username=document.getElementById('muUsername').value.trim(),password=document.getElementById('muPassword').value,role=document.getElementById('muRole').value;if(!name||!username||!password){showToast('Alle Felder ausfüllen ⚠️');return;}if(password.length<6){showToast('Passwort min. 6 Zeichen ⚠️');return;}try{const r=await fetch('/api/users',{method:'POST',headers:ah(),body:JSON.stringify({username,password,display_name:name,role})});const d=await r.json();if(d.error){showToast(d.error+' ⚠️');return;}showToast('Benutzer erstellt ✓');closeModal();loadUsers();}catch(e){showToast('Fehler ⚠️');}}
-function openEditUser(id,name,role,active){openModal('editUser',{id,name,role,active});}
-async function updateUser(id){const updates={display_name:document.getElementById('euName').value.trim(),role:document.getElementById('euRole').value};const pw=document.getElementById('euPassword').value;if(pw)updates.password=pw;try{await fetch('/api/users/'+id,{method:'PUT',headers:ah(),body:JSON.stringify(updates)});showToast('Benutzer aktualisiert ✓');closeModal();loadUsers();}catch(e){showToast('Fehler ⚠️');}}
-async function deactivateUser(id,name){if(!confirm('Benutzer "'+name+'" deaktivieren?'))return;try{await fetch('/api/users/'+id,{method:'DELETE',headers:ah()});showToast('Deaktiviert ✓');loadUsers();}catch(e){showToast('Fehler ⚠️');}}
-async function reactivateUser(id){try{await fetch('/api/users/'+id,{method:'PUT',headers:ah(),body:JSON.stringify({active:true})});showToast('Aktiviert ✓');loadUsers();}catch(e){showToast('Fehler ⚠️');}}
-
-async function createTask(){const title=document.getElementById('mtTitle').value.trim(),description=document.getElementById('mtDesc').value.trim();if(!title){showToast('Titel erforderlich ⚠️');return;}try{const r=await fetch('/api/tasks',{method:'POST',headers:ah(),body:JSON.stringify({title,description})});const d=await r.json();if(d.error){showToast(d.error+' ⚠️');return;}showToast('Aufgabe erstellt ✓');closeModal();loadAdminTasks();}catch(e){showToast('Fehler ⚠️');}}
-function openEditTask(id,title,description){openModal('editTask',{id,title,description});}
-async function updateTask(id){const title=document.getElementById('etTitle').value.trim(),description=document.getElementById('etDesc').value.trim();if(!title){showToast('Titel erforderlich ⚠️');return;}try{await fetch('/api/tasks/'+id,{method:'PUT',headers:ah(),body:JSON.stringify({title,description})});showToast('Aktualisiert ✓');closeModal();loadAdminTasks();}catch(e){showToast('Fehler ⚠️');}}
-async function deleteTask(id,title){if(!confirm('Aufgabe "'+title+'" entfernen?'))return;try{await fetch('/api/tasks/'+id,{method:'DELETE',headers:ah()});showToast('Entfernt ✓');loadAdminTasks();}catch(e){showToast('Fehler ⚠️');}}
-
-async function createTemplate(){const name=document.getElementById('stName').value.trim(),start_time=document.getElementById('stStart').value,end_time=document.getElementById('stEnd').value,color=document.getElementById('stColor').value;if(!name||!start_time||!end_time){showToast('Alle Felder ausfüllen ⚠️');return;}try{await fetch('/api/shift-templates',{method:'POST',headers:ah(),body:JSON.stringify({name,start_time,end_time,color})});showToast('Vorlage erstellt ✓');closeModal();loadAdminTemplates();}catch(e){showToast('Fehler ⚠️');}}
-async function deleteTemplate(id){if(!confirm('Vorlage löschen?'))return;try{await fetch('/api/shift-templates/'+id,{method:'DELETE',headers:ah()});showToast('Entfernt ✓');loadAdminTemplates();}catch(e){showToast('Fehler ⚠️');}}
-
-async function createShift(){const user_id=parseInt(document.getElementById('shUser').value),date=document.getElementById('shDate').value,start_time=document.getElementById('shStart').value,end_time=document.getElementById('shEnd').value,break_min=parseInt(document.getElementById('shBreak').value)||0,note=document.getElementById('shNote').value.trim();const tplSel=document.getElementById('shTpl');const template_id=tplSel.value?parseInt(tplSel.value):null;if(!user_id||!date||!start_time||!end_time){showToast('Alle Pflichtfelder ausfüllen ⚠️');return;}try{await fetch('/api/shifts',{method:'POST',headers:ah(),body:JSON.stringify({user_id,date,template_id,start_time,end_time,break_min,note})});showToast('Schicht eingetragen ✓');closeModal();loadSchedule();}catch(e){showToast('Fehler ⚠️');}}
-
-// ═══ DAMAGES ═══
-let allDamages=[], dmgPendingFiles=[], apPendingFiles=[];
-
-async function loadDamages(){
-  document.getElementById('dmgLoading').style.display='flex';
-  document.getElementById('dmgList').innerHTML='';
-  document.getElementById('dmgDetail').style.display='none';
-  document.getElementById('dmgSearch').closest('.dmg-search').style.display='';
-  document.querySelector('.dmg-top').style.display='';
-  try{
-    const r=await fetch('/api/damages',{headers:ah()});
-    if(r.status===401){doLogout();return;}
-    const data=await r.json();
-    document.getElementById('dmgLoading').style.display='none';
-    if(r.ok&&Array.isArray(data)){allDamages=data;renderDamages(allDamages);}
-    else{allDamages=[];document.getElementById('dmgList').innerHTML=`<div class="task-empty">⚠️ ${data.error||'Fehler beim Laden'}<br><small style="color:var(--text3)">Server neustarten falls Tabelle fehlt</small></div>`;}
-  }catch(e){document.getElementById('dmgLoading').style.display='none';document.getElementById('dmgList').innerHTML=`<div class="task-empty">⚠️ Verbindungsfehler<br><small style="color:var(--text3)">${e.message}</small></div>`;}
-}
-
-function filterDamages(){
-  const q=document.getElementById('dmgSearch').value.trim().toLowerCase();
-  const f=q?allDamages.filter(d=>(d.plate||'').toLowerCase().includes(q)||(d.first_name||'').toLowerCase().includes(q)||(d.last_name||'').toLowerCase().includes(q)||(d.damage_number||'').toLowerCase().includes(q)):allDamages;
-  renderDamages(f);
-}
-
-function renderDamages(list){
-  const el=document.getElementById('dmgList');
-  if(!list.length){el.innerHTML='<div class="task-empty">Keine Schäden protokolliert.</div>';return;}
-  const statusLabels={open:'Offen',in_progress:'In Bearbeitung',closed:'Erledigt'};
-  el.innerHTML=list.map((d,i)=>`<div class="dmg-card" style="animation-delay:${i*0.04+0.05}s" onclick="showDamageDetail(${d.id})">
-    <div class="dmg-card-top"><span class="dmg-number">${esc(d.damage_number)}</span><span class="dmg-status ${d.status}">${statusLabels[d.status]||d.status}</span></div>
-    <div class="dmg-card-plate">${esc(d.plate)}</div>
-    <div class="dmg-card-name">${esc(d.first_name)} ${esc(d.last_name)}${d.car_brand?' · '+esc(d.car_brand):''}</div>
-    <div class="dmg-card-meta"><span>📅 ${esc(d.incident_date)}</span>${d.incident_time?`<span>🕐 ${esc(d.incident_time)}</span>`:''}<span>📸 ${d.photo_count||0}</span><span>👤 ${esc(d.created_by_name||'')}</span></div>
-  </div>`).join('');
-}
-
-async function showDamageDetail(id){
-  document.getElementById('dmgList').innerHTML='';
-  document.getElementById('dmgSearch').closest('.dmg-search').style.display='none';
-  document.querySelector('.dmg-top').style.display='none';
-  const detail=document.getElementById('dmgDetail');
-  detail.style.display='block';
-  detail.innerHTML='<div class="loading"><div class="spinner"></div></div>';
-  try{
-    const r=await fetch('/api/damages/'+id,{headers:ah()});const data=await r.json();
-    const d=data.damage,photos=data.photos||[];
-    const statusLabels={open:'Offen',in_progress:'In Bearbeitung',closed:'Erledigt'};
-    const isAdmin=currentUser&&currentUser.role==='admin';
-    detail.innerHTML=`
-      <button class="btn btn-ghost" onclick="loadDamages()" style="margin-bottom:12px">← Zurück zur Liste</button>
-      <div class="dmg-detail">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div class="dmg-number" style="font-size:16px">${esc(d.damage_number)}</div>
-          <span class="dmg-status ${d.status}">${statusLabels[d.status]}</span>
-        </div>
-        <div class="dmg-detail-title" style="font-family:'JetBrains Mono',monospace;font-size:20px">${esc(d.plate)}</div>
-        <div class="dmg-detail-field"><strong>Kunde:</strong> ${esc(d.first_name)} ${esc(d.last_name)}</div>
-        ${d.car_brand?`<div class="dmg-detail-field"><strong>Fahrzeug:</strong> ${esc(d.car_brand)}${d.car_color?' ('+esc(d.car_color)+')':''}</div>`:''}
-        <div class="dmg-detail-field"><strong>Datum:</strong> ${esc(d.incident_date)}${d.incident_time?' um '+esc(d.incident_time)+' Uhr':''}</div>
-        <div class="dmg-detail-field"><strong>Erfasst von:</strong> ${esc(d.created_by_name||'—')}</div>
-        <div class="dmg-detail-desc">${esc(d.description)}</div>
-        ${isAdmin?`<div style="display:flex;gap:8px;margin-top:12px">
-          <select class="form-input" id="dmgStatusSel" style="flex:1"><option value="open" ${d.status==='open'?'selected':''}>Offen</option><option value="in_progress" ${d.status==='in_progress'?'selected':''}>In Bearbeitung</option><option value="closed" ${d.status==='closed'?'selected':''}>Erledigt</option></select>
-          <button class="btn btn-accent btn-sm" onclick="updateDamageStatus(${d.id})">Status ändern</button>
-        </div>`:''}
-      </div>
-      <div class="dmg-detail" style="margin-top:0">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:14px;font-weight:700">📸 Fotos (${photos.length})</div>
-          <button class="btn btn-outline btn-xs" onclick="openModal('addPhotos',{id:${d.id}})">+ Fotos</button>
-        </div>
-        ${photos.length?`<div class="dmg-photos">${photos.map(p=>{
-          const labelNames={front:'Vorne',back:'Hinten',left:'Links',right:'Rechts',detail:'Detail',other:'Sonstige'};
-          const src=p.filepath.startsWith('http')?p.filepath:'/api'+p.filepath;
-          return`<div class="dmg-photo"><img src="${src}" alt="${esc(p.label)}" onclick="window.open(this.src,'_blank')" loading="lazy"><div class="dmg-photo-label">${labelNames[p.label]||p.label} · ${p.created_at?p.created_at.slice(0,16).replace('T',' '):''}</div></div>`;
-        }).join('')}</div>`:'<div class="task-empty" style="padding:16px">Noch keine Fotos hochgeladen.</div>'}
-      </div>
-      <div style="background:var(--surface2);border-radius:var(--r);padding:14px;margin-top:8px">
-        <div style="font-size:12px;color:var(--text3)">Schadensnummer für den Kunden:</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;color:var(--red);margin-top:4px;text-align:center;padding:8px;background:var(--surface);border-radius:8px;border:1.5px solid var(--border)">${esc(d.damage_number)}</div>
-      </div>`;
-  }catch(e){detail.innerHTML='<div class="task-empty">⚠️ Fehler beim Laden</div>';}
-}
-
-async function updateDamageStatus(id){
-  const status=document.getElementById('dmgStatusSel').value;
-  try{await fetch('/api/damages/'+id,{method:'PUT',headers:ah(),body:JSON.stringify({status})});showToast('Status aktualisiert ✓');showDamageDetail(id);}catch(e){showToast('Fehler ⚠️');}
-}
-
-function handleDmgFiles(files){
-  dmgPendingFiles=[...dmgPendingFiles,...files];
-  const prev=document.getElementById('dmPhotoPreview');
-  prev.innerHTML=dmgPendingFiles.map((f,i)=>`<div style="width:60px;height:60px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);position:relative"><img src="${URL.createObjectURL(f)}" style="width:100%;height:100%;object-fit:cover"><div style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.5);color:#fff;width:18px;height:18px;border-radius:50%;font-size:11px;display:grid;place-items:center;cursor:pointer" onclick="removeDmgFile(${i})">✕</div></div>`).join('');
-}
-function removeDmgFile(i){dmgPendingFiles.splice(i,1);handleDmgFiles([]);}
-function handleApFiles(files){
-  apPendingFiles=[...apPendingFiles,...files];
-  const prev=document.getElementById('apPreview');
-  prev.innerHTML=apPendingFiles.map((f,i)=>`<div style="width:60px;height:60px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)"><img src="${URL.createObjectURL(f)}" style="width:100%;height:100%;object-fit:cover"></div>`).join('');
-}
-
-async function createDamage(){
-  const first_name=document.getElementById('dmFirstName').value.trim();
-  const last_name=document.getElementById('dmLastName').value.trim();
-  const plate=document.getElementById('dmPlate').value.trim().toUpperCase();
-  const car_brand=document.getElementById('dmBrand').value.trim();
-  const car_color=document.getElementById('dmColor').value.trim();
-  const incident_time=document.getElementById('dmTime').value;
-  const description=document.getElementById('dmDesc').value.trim();
-  if(!first_name||!last_name||!plate||!description){showToast('Pflichtfelder ausfüllen ⚠️');return;}
-  try{
-    const r=await fetch('/api/damages',{method:'POST',headers:ah(),body:JSON.stringify({first_name,last_name,plate,car_brand,car_color,incident_time,description})});
-    const d=await r.json();
-    if(d.error){showToast(d.error+' ⚠️');return;}
-    // Upload photos if any
-    if(dmgPendingFiles.length>0){
-      const fd=new FormData();
-      dmgPendingFiles.forEach(f=>fd.append('photos',f));
-      fd.append('label','other');
-      await fetch('/api/damages/'+d.id+'/photos',{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
-    }
-    dmgPendingFiles=[];
-    showToast('Schaden '+d.damage_number+' protokolliert ✓');
-    closeModal();loadDamages();
-    setTimeout(()=>showDamageDetail(d.id),500);
-  }catch(e){showToast('Fehler ⚠️');}
-}
-
-async function uploadMorePhotos(){
-  const damageId=document.getElementById('apDamageId').value;
-  const label=document.getElementById('apLabel').value;
-  if(!apPendingFiles.length){showToast('Keine Fotos ausgewählt ⚠️');return;}
-  const fd=new FormData();
-  apPendingFiles.forEach(f=>fd.append('photos',f));
-  fd.append('label',label);
-  try{
-    await fetch('/api/damages/'+damageId+'/photos',{method:'POST',headers:{'Authorization':'Bearer '+authToken},body:fd});
-    apPendingFiles=[];
-    showToast('Fotos hochgeladen ✓');
-    closeModal();showDamageDetail(parseInt(damageId));
-  }catch(e){showToast('Fehler ⚠️');}
-}
-</script>
+<script src="/app.js"></script>
 </body>
 </html>

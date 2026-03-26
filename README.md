@@ -1,6 +1,6 @@
 # 🅿️ Park King OS
 
-Parkplatz-Management System mit ParkingPro Integration, SQLite Datenbank und JWT Auth.
+Parkplatz-Management System mit ParkingPro Integration, SQLite Datenbank, JWT Auth und **Offline-PWA-Modus**.
 
 ## Architektur
 
@@ -13,7 +13,12 @@ parkking-os/
 │   ├── routes.js      → Alle API-Endpunkte
 │   └── scraper.js     → ParkingPro Puppeteer Scraper
 ├── public/
-│   └── index.html     → Frontend (Phase 2)
+│   ├── index.html     → Frontend (PWA)
+│   ├── app.js         → App-Logik (offline-first)
+│   ├── offline-store.js → IndexedDB Cache + Sync Queue
+│   ├── sw.js          → Service Worker
+│   ├── manifest.json  → PWA Manifest
+│   └── icons/         → PWA Icons (192px + 512px)
 ├── data/
 │   └── parkking.db    → SQLite Datenbank (auto-created)
 ├── Dockerfile         → Docker Build für Render
@@ -21,86 +26,39 @@ parkking-os/
 └── package.json
 ```
 
-## API Endpunkte
+## Offline-Modus (PWA)
 
-### Auth
-| Methode | Endpoint | Beschreibung |
-|---------|----------|-------------|
-| POST | `/api/auth/login` | Login (username + password) → JWT Token |
-| GET | `/api/auth/me` | Aktueller User |
+### So funktioniert es
 
-### Buchungen
-| Methode | Endpoint | Beschreibung |
-|---------|----------|-------------|
-| GET | `/api/bookings` | Liste (Filter: company, date, type, status, search) |
-| GET | `/api/bookings/:id` | Detail + Protokoll |
-| POST | `/api/bookings` | Neue Buchung anlegen |
-| PUT | `/api/bookings/:id` | Buchung bearbeiten |
-| POST | `/api/bookings/:id/checkin` | Check-in |
-| POST | `/api/bookings/:id/checkout` | Check-out |
-| POST | `/api/bookings/:id/pay` | Zahlung erfassen |
-| POST | `/api/bookings/:id/noshow` | No-Show markieren |
-| POST | `/api/bookings/:id/key` | Schlüssel an/abgeben |
-| POST | `/api/bookings/:id/phone` | Telefonat vermerken |
+1. **Morgens mit Internet öffnen** → App lädt alle Tagesbuchungen und cached sie in IndexedDB
+2. **Internet aus** → App arbeitet komplett offline aus dem Cache:
+   - Buchungen anzeigen, filtern, durchsuchen
+   - Labels generieren und drucken (Canvas-basiert, kein Server nötig)
+   - Check-ins / Check-outs durchführen
+   - Buchungen bearbeiten
+   - Tagesaufgaben abhaken
+   - Dienstplan anschauen
+3. **Internet wieder da** → Alle Offline-Änderungen werden automatisch synchronisiert
 
-### Scraping
-| Methode | Endpoint | Beschreibung |
-|---------|----------|-------------|
-| POST | `/api/scrape` | Einzelne Firma scrapen |
-| POST | `/api/scrape/all` | Alle Firmen (Admin) |
-| GET | `/api/scrape/log` | Scrape-Protokoll |
+### iPhone Homescreen Installation
 
-### User (Admin)
-| Methode | Endpoint | Beschreibung |
-|---------|----------|-------------|
-| GET | `/api/users` | Alle User |
-| POST | `/api/users` | User anlegen |
-| PUT | `/api/users/:id` | User bearbeiten |
-| DELETE | `/api/users/:id` | User deaktivieren |
+1. Safari → Park King OS öffnen
+2. Teilen-Button → "Zum Home-Bildschirm"
+3. App läuft jetzt standalone ohne Safari-UI
 
-### Sonstiges
-| Methode | Endpoint | Beschreibung |
-|---------|----------|-------------|
-| GET | `/api/stats` | Dashboard-Statistiken |
-| GET | `/api/companies` | Firmen-Liste |
-| GET/PUT | `/api/settings` | Einstellungen (Admin) |
-| GET | `/api/labels` | Label-Druckprotokoll |
-| POST | `/api/labels` | Label erstellen |
-| GET | `/api/health` | Health Check |
+### Was offline NICHT funktioniert
 
-## Rollen
-
-| Rolle | Buchungen | Check-in/out | Labels | User verwalten | Einstellungen |
-|-------|-----------|-------------|--------|---------------|---------------|
-| **Admin** | ✅ CRUD | ✅ | ✅ | ✅ | ✅ |
-| **Staff** | ✅ Lesen + Bearbeiten | ✅ | ✅ | ❌ | ❌ |
+- Neuen Scrape auslösen (braucht Server + Chromium)
+- Neue Benutzer anlegen (Admin-Funktion)
+- Fotos hochladen (braucht Upload-Server)
+- Neue Schäden protokollieren (braucht Server für Schadensnummer)
 
 ## Deployment auf Render
 
 1. Push zu GitHub
 2. Render → New → Web Service → Docker
 3. Disk hinzufügen: `/app/data` (1 GB)
-4. Env-Vars setzen (gleiche wie Label Print Tool)
+4. Env-Vars setzen
 5. Deploy
 
-## Lokale Entwicklung
-
-```bash
-cp .env.example .env
-# .env ausfüllen
-npm install
-npm run dev
-```
-
-Default Login: `admin` / `admin123`
-
-## Datenbank
-
-SQLite mit WAL-Modus. Tabellen:
-- **users** — Admin + Mitarbeiter
-- **companies** — ParkingPro Firmen
-- **bookings** — Alle Buchungen (gescrapt + manuell)
-- **booking_log** — Protokoll (wer hat was wann gemacht)
-- **labels** — Druckaufträge
-- **scrape_log** — Scraping-Protokoll
-- **settings** — App-Einstellungen
+Default Login: `admin` / `Berlin123!`

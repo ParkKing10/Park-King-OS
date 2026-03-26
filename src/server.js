@@ -15,6 +15,14 @@ const PORT = process.env.PORT || 3000;
 
 // ─── Middleware ──────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
+
+// Service Worker must not be cached by the browser
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'data', 'uploads')));
 
