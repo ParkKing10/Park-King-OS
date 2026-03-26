@@ -508,47 +508,53 @@ async function scrapeYearView(companyId) {
     const rawBookings = Array.from(allCollected.values());
     console.log(`[YearScraper][${company.name}] Total collected: ${rawBookings.length}`);
 
-    // Upsert into database — use date_in (parkdatum) as scraped_date
+    // Helper: parse date string like "01.03.2026" or "2026-03-01" to "YYYY-MM-DD"
+    function parseDate(str) {
+      if (!str) return null;
+      const parts = str.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
+      if (parts) {
+        const day = parts[1].padStart(2, '0');
+        const month = parts[2].padStart(2, '0');
+        const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
+        return `${year}-${month}-${day}`;
+      }
+      if (str.match(/^\d{4}-\d{2}-\d{2}/)) return str.substring(0, 10);
+      return null;
+    }
+
+    // Upsert into database — create TWO entries per booking:
+    //   1. type='in' (Annahme) on the parkdatum (arrival date)
+    //   2. type='out' (Rückgabe) on the rueckgabedatum (departure date)
     let created = 0, updated = 0;
     for (const b of rawBookings) {
-      // Parse the parkdatum to get a proper date for scraped_date
-      let scrapedDate = null;
-      if (b.parkdatum) {
-        // Try DD.MM.YYYY HH:MM or DD.MM.YYYY
-        const parts = b.parkdatum.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
-        if (parts) {
-          const day = parts[1].padStart(2, '0');
-          const month = parts[2].padStart(2, '0');
-          const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
-          scrapedDate = `${year}-${month}-${day}`;
-        } else if (b.parkdatum.match(/^\d{4}-\d{2}-\d{2}/)) {
-          scrapedDate = b.parkdatum.substring(0, 10);
-        }
-      }
-      if (!scrapedDate) scrapedDate = new Date().toISOString().split('T')[0];
+      const arrivalDate = parseDate(b.parkdatum);
+      const departureDate = parseDate(b.rueckgabe);
 
-      // Also parse rueckgabe date
-      let rueckgabeDatum = null;
-      if (b.rueckgabe) {
-        const parts = b.rueckgabe.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
-        if (parts) {
-          const day = parts[1].padStart(2, '0');
-          const month = parts[2].padStart(2, '0');
-          const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
-          rueckgabeDatum = `${year}-${month}-${day}`;
-        }
+      // 1) Annahme entry on arrival date
+      if (arrivalDate) {
+        const inData = {
+          ...b,
+          rueckgabeDatum: departureDate || b.rueckgabe,
+          rueckgabeZeit: b.rueckgabeZeit || null,
+          type: 'checkin',
+        };
+        const r1 = upsertBookingFromScrape(inData, companyId, arrivalDate);
+        if (r1.action === 'created') created++; else updated++;
       }
 
-      const bookingData = {
-        ...b,
-        rueckgabeDatum: rueckgabeDatum || b.rueckgabe,
-        rueckgabeZeit: b.rueckgabeZeit || null,
-        type: 'checkin',
-      };
-
-      const result = upsertBookingFromScrape(bookingData, companyId, scrapedDate);
-      if (result.action === 'created') created++;
-      else updated++;
+      // 2) Rückgabe entry on departure date
+      if (departureDate && departureDate !== arrivalDate) {
+        const outData = {
+          ...b,
+          // For the checkout row, swap the time: zeit = rueckgabeZeit
+          zeit: b.rueckgabeZeit || null,
+          rueckgabeDatum: departureDate,
+          rueckgabeZeit: b.rueckgabeZeit || null,
+          type: 'checkout',
+        };
+        const r2 = upsertBookingFromScrape(outData, companyId, departureDate);
+        if (r2.action === 'created') created++; else updated++;
+      }
     }
 
     const duration = Date.now() - startTime;

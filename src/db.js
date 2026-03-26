@@ -107,7 +107,7 @@ function initSchema() {
       updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
       created_by      INTEGER REFERENCES users(id),
       
-      UNIQUE(external_id, company_id, scraped_date)
+      UNIQUE(external_id, company_id, scraped_date, type)
     );
 
     -- ═══ BOOKING LOG / PROTOKOLL ═══
@@ -243,6 +243,14 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_damage_photos_damage ON damage_photos(damage_id);
   `);
 
+  // Migration: update UNIQUE constraint to include type (for year import in+out entries)
+  try {
+    // Check if old constraint exists by trying to create the new index
+    d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_unique_v2 ON bookings(external_id, company_id, scraped_date, type)`);
+  } catch (e) {
+    console.log('[DB] Unique index migration note:', e.message);
+  }
+
   console.log('[DB] Schema initialized');
 }
 
@@ -321,10 +329,11 @@ function seedDefaults() {
 function upsertBookingFromScrape(booking, companyId, scrapedDate) {
   const d = getDb();
 
-  // Check if booking already exists for this date
+  // Check if booking already exists for this date + type
+  const bookingType = booking.type === 'checkout' ? 'out' : 'in';
   const existing = d.prepare(
-    'SELECT id, status, paid, key_handed_in, phone_contacted, wash_done, comment, shuttle_driver FROM bookings WHERE external_id = ? AND company_id = ? AND scraped_date = ?'
-  ).get(booking.code || booking.uid, companyId, scrapedDate);
+    'SELECT id, status, paid, key_handed_in, phone_contacted, wash_done, comment, shuttle_driver FROM bookings WHERE external_id = ? AND company_id = ? AND scraped_date = ? AND type = ?'
+  ).get(booking.code || booking.uid, companyId, scrapedDate, bookingType);
 
   if (existing) {
     // Update scraped fields but preserve user-edited fields
