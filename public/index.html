@@ -350,6 +350,15 @@
       <div class="admin-section-title">📊 Monatsstunden</div>
       <div id="monthlyHours"></div>
     </div>
+    <div class="admin-section">
+      <div class="admin-section-title">📥 Jahres-Import (einmalig)</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Importiert ALLE Buchungen aus der Jahresansicht von ParkingPro. Nur einmal nötig, danach übernimmt das tägliche Scraping.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" id="yearScrapePK" onclick="yearScrape('parkking')">🅿️ Biemann importieren</button>
+        <button class="btn btn-outline btn-sm" id="yearScrapePSF" onclick="yearScrape('psfmsf')">✈️ Hasloh importieren</button>
+      </div>
+      <div id="yearScrapeStatus" style="font-size:13px;margin-top:8px;color:var(--text3)"></div>
+    </div>
   </div>
 
   <!-- TAB: Schäden -->
@@ -364,8 +373,33 @@
     <div id="dmgDetail" style="display:none"></div>
   </div>
 
+  <!-- TAB: Buchung suchen -->
+  <div class="tab-page" id="tabSearch">
+    <div style="font-size:18px;font-weight:700;margin-bottom:16px">🔎 Buchung suchen</div>
+    <div class="search-filters">
+      <div class="search-bar"><span class="si">🔍</span><input type="text" id="globalSearchInput" placeholder="Kennzeichen, Name, Telefon, Buchungsnr..." oninput="debounceGlobalSearch()"></div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="flex:1"><label style="font-size:12px;color:var(--text3);margin-bottom:4px;display:block">Von</label><input type="date" class="form-input" id="searchDateFrom" onchange="globalSearch()"></div>
+        <div style="flex:1"><label style="font-size:12px;color:var(--text3);margin-bottom:4px;display:block">Bis</label><input type="date" class="form-input" id="searchDateTo" onchange="globalSearch()"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="company-btn" id="search-btn-all" onclick="setSearchCompany('')" style="flex:1">Alle</button>
+        <button class="company-btn" id="search-btn-parkking" onclick="setSearchCompany('parkking')" style="flex:1">🅿️ Biemann</button>
+        <button class="company-btn" id="search-btn-psfmsf" onclick="setSearchCompany('psfmsf')" style="flex:1">✈️ Hasloh</button>
+      </div>
+    </div>
+    <div id="searchStatus" style="font-size:13px;color:var(--text3);margin-bottom:8px"></div>
+    <div id="searchLoading" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Suche läuft...</div></div>
+    <div id="searchResults" class="booking-list"></div>
+    <div id="searchEmpty" class="empty" style="display:none">
+      <div style="font-size:40px;margin-bottom:8px">🔎</div>
+      <div>Gib einen Suchbegriff ein oder wähle einen Datumsbereich</div>
+    </div>
+  </div>
+
   <nav class="bottom-nav">
     <button class="nav-item active" onclick="switchTab('bookings')" id="navBookings"><span class="nav-icon">🅿️</span>Buchungen</button>
+    <button class="nav-item" onclick="switchTab('search')" id="navSearch"><span class="nav-icon">🔎</span>Suchen</button>
     <button class="nav-item" onclick="switchTab('tasks')" id="navTasks"><span class="nav-icon">📋</span>Aufgaben</button>
     <button class="nav-item" onclick="switchTab('schedule')" id="navSchedule"><span class="nav-icon">📅</span>Dienstplan</button>
     <button class="nav-item" onclick="switchTab('damages')" id="navDamages"><span class="nav-icon">🚨</span>Schäden</button>

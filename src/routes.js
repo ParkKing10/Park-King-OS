@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { getDb, addLog } = require('./db');
 const { login, requireAuth, requireAdmin, createUser, updateUser, listUsers } = require('./auth');
-const { scrapeCompany, autoScrapeAll } = require('./scraper');
+const { scrapeCompany, scrapeYearView, autoScrapeAll } = require('./scraper');
 
 const router = express.Router();
 
@@ -140,6 +140,36 @@ router.get('/bookings', requireAuth, (req, res) => {
   `).get(...(company ? [statsDate, company] : [statsDate]));
 
   res.json({ bookings, stats, date: statsDate });
+});
+
+// ─── BOOKING SEARCH (across all dates) ─────────────────────────────────
+
+router.get('/bookings/search', requireAuth, (req, res) => {
+  const d = getDb();
+  const { q, company, date_from, date_to, limit } = req.query;
+
+  if (!q && !date_from && !date_to) {
+    return res.status(400).json({ error: 'Suchbegriff oder Datumsbereich erforderlich' });
+  }
+
+  let sql = 'SELECT * FROM bookings WHERE 1=1';
+  const params = [];
+
+  if (company) { sql += ' AND company_id = ?'; params.push(company); }
+  if (date_from) { sql += ' AND scraped_date >= ?'; params.push(date_from); }
+  if (date_to) { sql += ' AND scraped_date <= ?'; params.push(date_to); }
+  if (q) {
+    sql += ' AND (plate LIKE ? OR name LIKE ? OR phone LIKE ? OR external_id LIKE ? OR flight_code LIKE ? OR car LIKE ?)';
+    const s = `%${q}%`;
+    params.push(s, s, s, s, s, s);
+  }
+
+  sql += ' ORDER BY scraped_date DESC, COALESCE(time_in, time_out, \'99:99\') ASC';
+  sql += ' LIMIT ?';
+  params.push(parseInt(limit) || 100);
+
+  const bookings = d.prepare(sql).all(...params);
+  res.json({ bookings, total: bookings.length });
 });
 
 router.get('/bookings/:id', requireAuth, (req, res) => {
@@ -325,6 +355,29 @@ router.get('/scrape/log', requireAuth, (req, res) => {
   const d = getDb();
   const log = d.prepare('SELECT * FROM scrape_log ORDER BY created_at DESC LIMIT 20').all();
   res.json(log);
+});
+
+// ─── YEAR SCRAPE (one-time full import) ─────────────────────────────────
+
+const activeYearScrapes = {};
+
+router.post('/scrape/year', requireAuth, requireAdmin, async (req, res) => {
+  const { company } = req.body;
+  const companyId = company || 'parkking';
+
+  if (activeYearScrapes[companyId]) {
+    return res.json({ message: 'Jahres-Import läuft bereits', inProgress: true });
+  }
+
+  try {
+    activeYearScrapes[companyId] = true;
+    const result = await scrapeYearView(companyId);
+    delete activeYearScrapes[companyId];
+    res.json({ message: 'Jahres-Import erfolgreich', ...result });
+  } catch (err) {
+    delete activeYearScrapes[companyId];
+    res.status(500).json({ error: 'Jahres-Import fehlgeschlagen', detail: err.message });
+  }
 });
 
 // ─── STATS / DASHBOARD ─────────────────────────────────────────────────

@@ -212,6 +212,7 @@ function switchTab(tab){
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(tab==='bookings'){document.getElementById('tabBookings').classList.add('active');document.getElementById('navBookings').classList.add('active');}
+  else if(tab==='search'){document.getElementById('tabSearch').classList.add('active');document.getElementById('navSearch').classList.add('active');initSearchTab();}
   else if(tab==='tasks'){document.getElementById('tabTasks').classList.add('active');document.getElementById('navTasks').classList.add('active');loadTasks();}
   else if(tab==='schedule'){document.getElementById('tabSchedule').classList.add('active');document.getElementById('navSchedule').classList.add('active');loadSchedule();}
   else if(tab==='damages'){document.getElementById('tabDamages').classList.add('active');document.getElementById('navDamages').classList.add('active');loadDamages();}
@@ -770,6 +771,159 @@ async function uploadMorePhotos(){
     showToast('Fotos hochgeladen ✓');
     closeModal();showDamageDetail(parseInt(damageId));
   }catch(e){showToast('Fehler ⚠️');}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BOOKING SEARCH — Global search across all dates
+// ═══════════════════════════════════════════════════════════════════════
+
+let searchCompanyFilter = '';
+let searchDebounceTimer = null;
+
+function initSearchTab() {
+  // Set default: "Alle" active
+  setSearchCompany(searchCompanyFilter, true);
+  const empty = document.getElementById('searchEmpty');
+  const q = document.getElementById('globalSearchInput').value.trim();
+  const df = document.getElementById('searchDateFrom').value;
+  const dt = document.getElementById('searchDateTo').value;
+  if (!q && !df && !dt) empty.style.display = '';
+}
+
+function setSearchCompany(id, noSearch) {
+  searchCompanyFilter = id;
+  ['all','parkking','psfmsf'].forEach(k => {
+    const btn = document.getElementById('search-btn-' + k);
+    if (btn) btn.classList.toggle('active', (k === 'all' && !id) || k === id);
+  });
+  if (!noSearch) globalSearch();
+}
+
+function debounceGlobalSearch() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(globalSearch, 350);
+}
+
+async function globalSearch() {
+  const q = document.getElementById('globalSearchInput').value.trim();
+  const dateFrom = document.getElementById('searchDateFrom').value;
+  const dateTo = document.getElementById('searchDateTo').value;
+  const resultDiv = document.getElementById('searchResults');
+  const statusDiv = document.getElementById('searchStatus');
+  const loadingDiv = document.getElementById('searchLoading');
+  const emptyDiv = document.getElementById('searchEmpty');
+
+  if (!q && !dateFrom && !dateTo) {
+    resultDiv.innerHTML = '';
+    statusDiv.innerHTML = '';
+    emptyDiv.style.display = '';
+    return;
+  }
+
+  emptyDiv.style.display = 'none';
+  loadingDiv.style.display = 'flex';
+  resultDiv.innerHTML = '';
+  statusDiv.innerHTML = '';
+
+  try {
+    let url = '/api/bookings/search?';
+    const params = [];
+    if (q) params.push('q=' + encodeURIComponent(q));
+    if (searchCompanyFilter) params.push('company=' + searchCompanyFilter);
+    if (dateFrom) params.push('date_from=' + dateFrom);
+    if (dateTo) params.push('date_to=' + dateTo);
+    url += params.join('&');
+
+    const r = await fetch(url, { headers: ah() });
+    const data = await r.json();
+
+    loadingDiv.style.display = 'none';
+
+    if (!data.bookings || data.bookings.length === 0) {
+      resultDiv.innerHTML = '<div class="empty"><div style="font-size:40px;margin-bottom:8px">🤷</div><div>Keine Buchungen gefunden</div></div>';
+      statusDiv.innerHTML = '0 Ergebnisse';
+      return;
+    }
+
+    statusDiv.innerHTML = `${data.bookings.length} Ergebnis${data.bookings.length !== 1 ? 'se' : ''} gefunden`;
+    resultDiv.innerHTML = data.bookings.map((b, i) => {
+      const isIn = b.type === 'in';
+      const cn = b.company_id === 'parkking' ? 'PK' : b.company_id === 'psfmsf' ? 'PSF' : b.company_id;
+      const time = isIn ? b.time_in : b.time_out;
+      const dateDisplay = b.scraped_date ? formatDateDE(b.scraped_date) : '—';
+      const ret = b.date_out ? formatDateDE(b.date_out) + (b.time_out ? ' ' + b.time_out : '') : '';
+      return `<div class="bcard" style="animation-delay:${Math.min(i, 15) * 0.03 + 0.05}s">
+        <div class="bcard-row">
+          <div class="bcard-stripe ${isIn ? 'in' : 'out'}">
+            ${b.flight_code ? `<div class="sf">✈${esc(b.flight_code)}</div>` : ''}
+            <div class="st">${esc(time) || '—'}</div>
+          </div>
+          <div class="bcard-body">
+            <div class="bcard-top">
+              <span class="bcard-badge pk">${cn}</span>
+              <span style="font-size:12px;color:var(--text3)">${dateDisplay}</span>
+            </div>
+            <div class="bcard-plate">${esc(b.plate) || '—'} ${b.external_id ? '<span style="color:var(--text3);font-size:12px;font-weight:400">#' + esc(b.external_id) + '</span>' : ''}</div>
+            <div class="bcard-name">${esc(b.name) || '—'}</div>
+            <div class="bcard-meta">
+              ${ret ? `<span>↩ <strong>${esc(ret)}</strong></span>` : ''}
+              ${b.car ? `<span>🚗 ${esc(b.car)}</span>` : ''}
+              ${b.pax ? `<span>👤 ${b.pax}</span>` : ''}
+              ${b.phone ? `<span>📞 ${esc(b.phone)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    loadingDiv.style.display = 'none';
+    resultDiv.innerHTML = '<div class="empty">⚠️ Fehler bei der Suche</div>';
+  }
+}
+
+function formatDateDE(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return parts[2] + '.' + parts[1] + '.' + parts[0];
+  return dateStr;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  YEAR SCRAPE — One-time full import
+// ═══════════════════════════════════════════════════════════════════════
+
+async function yearScrape(companyId) {
+  const statusDiv = document.getElementById('yearScrapeStatus');
+  const btn = companyId === 'parkking' ? document.getElementById('yearScrapePK') : document.getElementById('yearScrapePSF');
+  const companyName = companyId === 'parkking' ? 'Biemann' : 'Hasloh';
+
+  if (!confirm(`Alle Buchungen von ${companyName} aus der Jahresansicht importieren?\n\nDas kann einige Minuten dauern.`)) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Importiert...';
+  statusDiv.innerHTML = `<span style="color:var(--accent)">⏳ ${companyName} wird importiert... Bitte warten.</span>`;
+
+  try {
+    const r = await fetch('/api/scrape/year', {
+      method: 'POST',
+      headers: ah(),
+      body: JSON.stringify({ company: companyId })
+    });
+    const data = await r.json();
+
+    if (data.error) {
+      statusDiv.innerHTML = `<span style="color:var(--red)">❌ ${data.error}: ${data.detail || ''}</span>`;
+    } else {
+      statusDiv.innerHTML = `<span style="color:var(--green)">✅ ${companyName}: ${data.total} Buchungen gefunden, ${data.created} neu, ${data.updated} aktualisiert (${Math.round(data.duration / 1000)}s)</span>`;
+      showToast(`${companyName} Import fertig ✓`);
+    }
+  } catch (e) {
+    statusDiv.innerHTML = `<span style="color:var(--red)">❌ Fehler: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = companyId === 'parkking' ? '🅿️ Biemann importieren' : '✈️ Hasloh importieren';
+  }
 }
 
 // ─── Lightbox (same as before) ──────────────────────────────────────────

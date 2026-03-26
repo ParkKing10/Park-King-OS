@@ -228,6 +228,164 @@ async function scrapeCompany(companyId) {
   }
 }
 
+// ─── Scrape YEAR VIEW (one-time full import) ────────────────────────────
+
+async function scrapeYearView(companyId) {
+  const d = getDb();
+  const company = d.prepare('SELECT * FROM companies WHERE id = ? AND active = 1').get(companyId);
+  if (!company) throw new Error('Firma nicht gefunden: ' + companyId);
+  if (!company.email || !company.password) throw new Error('Login-Daten fehlen für ' + company.name);
+
+  const startTime = Date.now();
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+
+  try {
+    await page.setViewport({ width: 1400, height: 900 });
+    console.log(`[YearScraper][${company.name}] Navigating...`);
+    await page.goto(company.base_url, { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Login
+    console.log(`[YearScraper][${company.name}] Login...`);
+    await page.goto(company.base_url + '/authentication/login', { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 3000));
+
+    const hasPasswordField = await page.evaluate(() => !!document.querySelector('input[type="password"]'));
+    if (hasPasswordField) {
+      await page.evaluate((email) => {
+        const selectors = ['input[type="email"]','input[name="email"]','input[name="username"]','#email','#username','input[type="text"]'];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.type !== 'password') {
+            el.value = email;
+            el.dispatchEvent(new Event('input', {bubbles:true}));
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            return;
+          }
+        }
+      }, company.email);
+
+      await page.evaluate((pass) => {
+        const el = document.querySelector('input[type="password"]');
+        if (el) { el.value = pass; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }
+      }, company.password);
+
+      await new Promise(r => setTimeout(r, 500));
+      await page.evaluate(() => {
+        const btns = ['button[type="submit"]','input[type="submit"]','.btn-primary','button.login','.btn-login'];
+        for (const sel of btns) { const el = document.querySelector(sel); if (el) { el.click(); return; } }
+        const form = document.querySelector('form');
+        if (form) { const btn = form.querySelector('button, input[type="submit"]'); if (btn) btn.click(); }
+      });
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    // Navigate to year/reservations view
+    console.log(`[YearScraper][${company.name}] Year view...`);
+    await page.goto(company.base_url + '/#view=reservations.year', { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 8000));
+
+    // Wait for data rows to load
+    let retries = 0, rowCount = 0;
+    while (retries < 15) {
+      rowCount = await page.evaluate(() => document.querySelectorAll('tr[data-uid]').length);
+      if (rowCount > 0) break;
+      await new Promise(r => setTimeout(r, 3000));
+      retries++;
+    }
+
+    console.log(`[YearScraper][${company.name}] Found ${rowCount} rows, extracting...`);
+
+    // Extract ALL bookings from year view
+    const rawBookings = await page.evaluate(() => {
+      const rows = document.querySelectorAll('tr[data-uid]');
+      const results = [];
+      for (const row of rows) {
+        const getField = (field) => {
+          const cell = row.querySelector(`td[data-field="${field}"]`);
+          return cell ? (cell.textContent || '').trim() : '';
+        };
+        const name = getField('fullName()').replace(/^ParkKing:\s*/i, '').trim();
+        const kennzeichen = getField('car.licensePlate');
+        const parkdatum = getField('arrivalDate') || getField('dayView.arrivalDate');
+        const rueckgabe = getField('departureDate') || getField('dayView.departureDate');
+        const personen = getField('numberOfPersons');
+        const tage = getField('parkedDaysCount()');
+        const flug = getField('flightNumber') || getField('dayView.flightNumber');
+        const telefon = getField('contactInformation.phone');
+        const fahrzeug = getField('car.description');
+        const code = getField('reservationCode');
+        const uid = row.getAttribute('data-uid');
+        const status = getField('status') || getField('reservationStatus');
+
+        if (kennzeichen || name) {
+          results.push({ name, kennzeichen, parkdatum, rueckgabe, personen, tage, flug, telefon, fahrzeug, code, uid, status });
+        }
+      }
+      return results;
+    });
+
+    console.log(`[YearScraper][${company.name}] Extracted ${rawBookings.length} bookings`);
+
+    // Upsert into database — use date_in (parkdatum) as scraped_date
+    let created = 0, updated = 0;
+    for (const b of rawBookings) {
+      // Parse the parkdatum to get a proper date for scraped_date
+      let scrapedDate = null;
+      if (b.parkdatum) {
+        // Try various date formats: DD.MM.YYYY, DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY
+        const parts = b.parkdatum.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
+        if (parts) {
+          const day = parts[1].padStart(2, '0');
+          const month = parts[2].padStart(2, '0');
+          const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
+          scrapedDate = `${year}-${month}-${day}`;
+        } else if (b.parkdatum.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          scrapedDate = b.parkdatum;
+        }
+      }
+      if (!scrapedDate) scrapedDate = new Date().toISOString().split('T')[0];
+
+      const bookingData = {
+        ...b,
+        zeit: null,
+        type: 'checkin',
+      };
+
+      const result = upsertBookingFromScrape(bookingData, companyId, scrapedDate);
+      if (result.action === 'created') created++;
+      else updated++;
+    }
+
+    const duration = Date.now() - startTime;
+
+    // Log the scrape
+    d.prepare('INSERT INTO scrape_log (company_id, date, bookings_found, bookings_new, bookings_updated, duration_ms) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(companyId, 'YEAR-IMPORT', rawBookings.length, created, updated, duration);
+
+    console.log(`[YearScraper][${company.name}] Done! ${rawBookings.length} found, ${created} new, ${updated} updated (${duration}ms)`);
+
+    return {
+      company: company.name,
+      date: 'YEAR-IMPORT',
+      total: rawBookings.length,
+      created,
+      updated,
+      duration
+    };
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    d.prepare('INSERT INTO scrape_log (company_id, date, error, duration_ms) VALUES (?, ?, ?, ?)')
+      .run(companyId, 'YEAR-IMPORT', error.message, duration);
+    throw error;
+  } finally {
+    await page.close();
+  }
+}
+
 // ─── Auto-scrape all companies ──────────────────────────────────────────
 
 async function autoScrapeAll() {
@@ -252,4 +410,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { scrapeCompany, autoScrapeAll, closeBrowser };
+module.exports = { scrapeCompany, scrapeYearView, autoScrapeAll, closeBrowser };
