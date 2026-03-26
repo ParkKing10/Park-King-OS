@@ -376,35 +376,118 @@ async function scrapeYearView(companyId) {
     for (const b of initial) allCollected.set(b.uid, b);
     console.log(`[YearScraper][${company.name}] Collected so far: ${allCollected.size}`);
 
+    // Debug: find the actual scroll container
+    const scrollDebug = await page.evaluate(() => {
+      const selectors = [
+        '.k-grid-content',
+        '.k-virtual-scrollable-wrap', 
+        '.k-grid-content-locked',
+        '.k-grid .k-grid-content',
+        '[data-role="grid"] .k-grid-content',
+        '.k-grid-content table',
+        '.k-scrollbar',
+        '.entity-list .k-grid-content',
+        '.k-grid-content > .k-virtual-scrollable-wrap',
+      ];
+      const info = [];
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+          info.push({
+            selector: sel,
+            scrollHeight: el.scrollHeight,
+            scrollTop: el.scrollTop,
+            clientHeight: el.clientHeight,
+            overflow: getComputedStyle(el).overflow + ' / ' + getComputedStyle(el).overflowY,
+            tag: el.tagName,
+            classes: el.className.substring(0, 100)
+          });
+        }
+      }
+      // Also check all elements with overflow auto/scroll
+      const allScrollable = [];
+      document.querySelectorAll('*').forEach(el => {
+        const style = getComputedStyle(el);
+        if ((style.overflow === 'auto' || style.overflow === 'scroll' || 
+             style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+            el.scrollHeight > el.clientHeight + 50) {
+          allScrollable.push({
+            tag: el.tagName,
+            classes: el.className.substring(0, 80),
+            scrollHeight: el.scrollHeight,
+            clientHeight: el.clientHeight,
+            scrollTop: el.scrollTop
+          });
+        }
+      });
+      return { known: info, scrollable: allScrollable.slice(0, 10) };
+    });
+    console.log(`[YearScraper][${company.name}] Scroll containers:`, JSON.stringify(scrollDebug, null, 2));
+
     // Scroll incrementally through the grid
     let stableRounds = 0;
     let lastCollectedSize = allCollected.size;
 
     for (let scrollAttempt = 0; scrollAttempt < 500; scrollAttempt++) {
-      // Scroll down by a fixed amount (roughly 5 rows worth of pixels)
-      await page.evaluate(() => {
-        const container = document.querySelector('.k-grid-content') 
-          || document.querySelector('.k-virtual-scrollable-wrap')
-          || document.querySelector('[data-role="grid"] .k-grid-content');
-        if (container) {
-          container.scrollTop += 200; // ~5 rows at ~40px each
-        } else {
-          window.scrollBy(0, 300);
-        }
-      });
+      // Scroll: find the scrollable container and scroll it
+      const scrollResult = await page.evaluate((attempt) => {
+        // Try all possible scrollable containers
+        const candidates = [];
+        document.querySelectorAll('*').forEach(el => {
+          const style = getComputedStyle(el);
+          if ((style.overflow === 'auto' || style.overflow === 'scroll' || 
+               style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+              el.scrollHeight > el.clientHeight + 50) {
+            candidates.push(el);
+          }
+        });
 
-      await new Promise(r => setTimeout(r, 300));
+        // Also try known Kendo selectors
+        const kendo = document.querySelector('.k-grid-content') 
+          || document.querySelector('.k-virtual-scrollable-wrap');
+        if (kendo && !candidates.includes(kendo)) candidates.unshift(kendo);
+
+        let scrolled = false;
+        for (const container of candidates) {
+          const before = container.scrollTop;
+          const maxScroll = container.scrollHeight - container.clientHeight;
+          if (before < maxScroll - 5) {
+            container.scrollTop = Math.min(before + 400, maxScroll);
+            scrolled = container.scrollTop > before;
+            if (scrolled) {
+              return { 
+                scrolled: true, 
+                scrollTop: container.scrollTop, 
+                maxScroll,
+                pct: Math.round((container.scrollTop / maxScroll) * 100),
+                tag: container.tagName,
+                cls: container.className.substring(0, 60)
+              };
+            }
+          }
+        }
+        return { scrolled: false, candidateCount: candidates.length };
+      }, scrollAttempt);
+
+      // Wait for Kendo to render new rows
+      await new Promise(r => setTimeout(r, 500));
 
       // Extract visible rows and merge
       const visible = await extractVisibleRows();
       for (const b of visible) allCollected.set(b.uid, b);
 
-      // Log progress every 20 scrolls
-      if ((scrollAttempt + 1) % 20 === 0) {
-        console.log(`[YearScraper][${company.name}] Scroll ${scrollAttempt + 1}: collected ${allCollected.size}${totalExpected ? '/' + totalExpected : ''}`);
+      // Log progress every 10 scrolls
+      if ((scrollAttempt + 1) % 10 === 0 || !scrollResult.scrolled) {
+        console.log(`[YearScraper][${company.name}] Scroll ${scrollAttempt + 1}: collected ${allCollected.size}${totalExpected ? '/' + totalExpected : ''} | scroll: ${JSON.stringify(scrollResult)}`);
       }
 
-      // Check if we've collected all expected or stopped finding new ones
+      // If we can't scroll anymore, we're done
+      if (!scrollResult.scrolled) {
+        console.log(`[YearScraper][${company.name}] Can't scroll further, stopping.`);
+        break;
+      }
+
+      // Check if we've collected all expected
       if (totalExpected > 0 && allCollected.size >= totalExpected) {
         console.log(`[YearScraper][${company.name}] Reached expected total: ${allCollected.size}`);
         break;
@@ -412,8 +495,8 @@ async function scrapeYearView(companyId) {
 
       if (allCollected.size === lastCollectedSize) {
         stableRounds++;
-        if (stableRounds >= 30) {
-          console.log(`[YearScraper][${company.name}] No new rows for 30 scrolls, stopping.`);
+        if (stableRounds >= 50) {
+          console.log(`[YearScraper][${company.name}] No new rows for 50 scrolls, stopping. Last scroll: ${JSON.stringify(scrollResult)}`);
           break;
         }
       } else {
