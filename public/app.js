@@ -333,35 +333,210 @@ function renderBookings(list){
   const el=document.getElementById('bookingList');if(!list.length){el.innerHTML='<div class="empty">Keine Treffer.</div>';return;}
   const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
   el.innerHTML=list.map((b,i)=>{const idx=allBookings.indexOf(b);const isIn=b.type==='in';const ret=(b.date_out||'')+(b.time_out?' '+b.time_out:'');const time=b.time_in||b.time_out||'';const flight=b.flight_code&&b.flight_code!=='TO BE UPDATED'?b.flight_code:'';const printed=printedIds[b.id];const offlineEdited=b._offlineEdited?'<span style="color:var(--orange);font-size:10px;margin-left:4px">⏳</span>':'';
-  return`<div class="bcard" style="animation-delay:${Math.min(i,15)*0.03+0.05}s"><div class="bcard-row" onclick="toggleEditor(${idx})"><div class="bcard-stripe ${isIn?'in':'out'}">${flight?`<div class="sf">✈${esc(flight)}</div>`:''}<div class="st">${esc(time)||'—'}</div></div><div class="bcard-body"><div class="bcard-top"><span class="bcard-badge pk">${cn}</span><span>${printed?'<span class="bcard-printed">🖨 gedruckt</span>':''}${offlineEdited}${b.status==='checked'?'<span style="color:var(--green);font-size:16px;margin-left:4px">✓</span>':''}</span></div><div class="bcard-plate">${esc(b.plate)||'—'} ${b.external_id?'<span style="color:var(--text3);font-size:12px;font-weight:400">#'+esc(b.external_id)+'</span>':''}</div><div class="bcard-name">${esc(b.name)||'—'}</div><div class="bcard-meta">${ret?`<span>↩ <strong>${esc(ret)}</strong></span>`:''}${b.car?`<span>🚗 ${esc(b.car)}</span>`:''}${b.pax?`<span>👤 ${b.pax}</span>`:''}</div></div></div><div class="bcard-editor" id="editor-${idx}"><div class="ed-row"><div class="ed-col"><div class="ed-label">Kundenname</div><input class="ed-input" id="en-${idx}" value="${esc(b.name)}" oninput="rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Rückgabe Datum</div><input class="ed-input" id="ed-${idx}" value="${esc(b.date_out)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Uhrzeit</div><input class="ed-input" id="et-${idx}" value="${esc(b.time_out)}" oninput="rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Fahrzeug</div><input class="ed-input" id="ec-${idx}" value="${esc(b.car)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Kennzeichen</div><input class="ed-input plate" id="ep-${idx}" value="${esc(b.plate)}" oninput="this.value=this.value.toUpperCase();rl(${idx})"></div></div><div class="ed-row"><div class="ed-col"><div class="ed-label">Stellplatz (optional)</div><input class="ed-input" id="es-${idx}" placeholder="z.B. Straße rechts, Reihe 3..." oninput="rl(${idx})"></div></div><div class="label-preview"><canvas id="cv-${idx}"></canvas></div><div class="ed-btns"><button class="btn btn-accent btn-sm" onclick="printL(${idx})">🖨 Drucken</button><button class="btn btn-white btn-sm" onclick="downloadL(${idx})">📲 Speichern</button><button class="btn btn-outline btn-sm" onclick="shareL(${idx})">↗ Teilen</button><button class="btn btn-ghost btn-sm" onclick="saveClose(${idx})">✓ Fertig</button></div></div></div>`;}).join('');
-  if(openEditorIdx>=0){const ed=document.getElementById('editor-'+openEditorIdx);if(ed){ed.classList.add('open');rl(openEditorIdx);}}
+  return`<div class="bcard" style="animation-delay:${Math.min(i,15)*0.03+0.05}s"><div class="bcard-row" onclick="openBookingDetail(${idx})"><div class="bcard-stripe ${isIn?'in':'out'}">${flight?`<div class="sf">✈${esc(flight)}</div>`:''}<div class="st">${esc(time)||'—'}</div></div><div class="bcard-body"><div class="bcard-top"><span class="bcard-badge pk">${cn}</span><span>${printed?'<span class="bcard-printed">🖨 gedruckt</span>':''}${offlineEdited}${b.status==='checked'?'<span style="color:var(--green);font-size:16px;margin-left:4px">✓</span>':''}</span></div><div class="bcard-plate">${esc(b.plate)||'—'} ${b.external_id?'<span style="color:var(--text3);font-size:12px;font-weight:400">#'+esc(b.external_id)+'</span>':''}</div><div class="bcard-name">${esc(b.name)||'—'}</div><div class="bcard-meta">${ret?`<span>↩ <strong>${esc(ret)}</strong></span>`:''}${b.car?`<span>🚗 ${esc(b.car)}</span>`:''}${b.pax?`<span>👤 ${b.pax}</span>`:''}</div></div></div></div>`;}).join('');
 }
 
-function toggleEditor(idx){if(openEditorIdx===idx){saveClose(idx);return;}if(openEditorIdx>=0){const p=document.getElementById('editor-'+openEditorIdx);if(p)p.classList.remove('open');}openEditorIdx=idx;const ed=document.getElementById('editor-'+idx);if(ed){ed.classList.add('open');rl(idx);}}
+// ─── Booking Detail View ──────────────────────────────────────────────
+let currentDetailIdx = -1;
 
-async function saveClose(idx){
-  const b=allBookings[idx];
-  if(b&&b.id){
-    const u={name:document.getElementById('en-'+idx).value.trim(),plate:document.getElementById('ep-'+idx).value.trim().toUpperCase(),car:document.getElementById('ec-'+idx).value.trim(),date_out:document.getElementById('ed-'+idx).value.trim(),time_out:document.getElementById('et-'+idx).value.trim(),comment:document.getElementById('es-'+idx).value.trim()};
-    try{
-      const r = await fetch('/api/bookings/'+b.id,{method:'PUT',headers:ah(),body:JSON.stringify(u)});
-      if(r.headers && r.headers.get('X-Offline') === 'true') {
-        // Queued offline by SW — update local
-        Object.assign(allBookings[idx], u, { _offlineEdited: true });
-        await OfflineStore.updateCachedBooking(b.id, u);
-      } else {
-        Object.assign(allBookings[idx],u);
-      }
-    }catch(e){
-      // Offline — queue manually
-      await OfflineStore.queueAction({ method:'PUT', url:'/api/bookings/'+b.id, body:JSON.stringify(u), timestamp:Date.now(), description:'Buchung bearbeiten' });
-      await OfflineStore.applyOfflineAction({ method:'PUT', url:'/api/bookings/'+b.id, body:JSON.stringify(u) });
+function openBookingDetail(idx) {
+  currentDetailIdx = idx;
+  const b = allBookings[idx];
+  if (!b) return;
+
+  const overlay = document.getElementById('bookingDetailOverlay');
+  const cn = currentCompany === 'parkking' ? 'Biemann' : 'Hasloh';
+  const isIn = b.type === 'in';
+  const flightIn = b.flight_code && b.flight_code !== 'TO BE UPDATED' ? b.flight_code : '';
+  const flightOut = b.flight_out || '';
+  const checkedIn = b.checked_in_at;
+  const checkedOut = b.checked_out_at;
+  const checkinTime = checkedIn ? new Date(checkedIn).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
+
+  overlay.innerHTML = `
+    <div class="bd-header">
+      <button class="bd-back" onclick="closeBookingDetail()">‹</button>
+      <div class="bd-title">Buchung #${esc(b.external_id || b.uid || '')}</div>
+      <div class="bd-actions">
+        <button class="bd-action-btn" onclick="openLabelEditor(${idx})">🖨️</button>
+      </div>
+    </div>
+
+    ${b.external_id ? `<div class="bd-ext-id">Externe ID: ${esc(b.external_id)}</div>` : ''}
+
+    <div class="bd-section">
+      <div class="bd-info-grid">
+        <div>
+          <div class="bd-info-label">Name</div>
+          <div class="bd-info-value" style="font-weight:800">${esc(b.name) || '—'}</div>
+          ${b.phone ? `<div style="margin-top:4px"><a href="tel:${esc(b.phone)}" style="color:var(--blue);font-size:13px;font-weight:600;text-decoration:none">${esc(b.phone)}</a></div>` : ''}
+          ${b.pax ? `<div style="color:var(--accent);font-size:13px;font-weight:600;margin-top:2px">${b.pax} Personen</div>` : ''}
+        </div>
+        <div>
+          <div class="bd-info-label">Auto</div>
+          <div class="bd-info-value" style="font-weight:800;font-family:'JetBrains Mono',monospace">${esc(b.plate) || '—'}</div>
+          ${b.car ? `<div style="font-size:13px;color:var(--text2);margin-top:2px">${esc(b.car)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="bd-dates">
+      <div class="bd-date-col arrival">
+        <div class="bd-date-header">🚗 Parkdatum</div>
+        <div class="bd-date-val">${b.date_in ? formatDateNice(b.date_in) : '—'}</div>
+        <div class="bd-date-time">${esc(b.time_in) || '—'}</div>
+        <div class="bd-date-km">Km-Stand: ${b.km_in || 0}</div>
+        <button class="bd-check-btn checkin ${checkedIn ? 'done' : ''}" onclick="${checkedIn ? '' : `doCheckin(${idx})`}" ${checkedIn ? 'disabled' : ''}>
+          ${checkedIn ? `✅ Eingecheckt: ${checkinTime}` : '☐ Check-in'}
+        </button>
+      </div>
+      <div class="bd-date-col departure">
+        <div class="bd-date-header">🚗 Datum Retour</div>
+        <div class="bd-date-val">${b.date_out ? formatDateNice(b.date_out) : '—'}</div>
+        <div class="bd-date-time">${esc(b.time_out) || '—'}</div>
+        <div class="bd-date-km">Km-Stand: ${b.km_out || 0}</div>
+        <button class="bd-check-btn checkout" onclick="doCheckout(${idx})" ${checkedOut ? 'disabled' : ''}>
+          ${checkedOut ? '✅ Ausgecheckt' : '☐ Check-out'}
+        </button>
+      </div>
+    </div>
+
+    <div class="bd-flight-row">
+      <div class="bd-flight-col dep">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;opacity:.7;margin-bottom:2px">✈ Abflug</div>
+          <div class="bd-flight-code">${flightIn || 'TO BE UPDATED'}</div>
+        </div>
+      </div>
+      <div class="bd-flight-col arr">
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;opacity:.7;margin-bottom:2px">✈ Ankunft</div>
+          <div class="bd-flight-code">${flightOut || b.flight_code || '—'}</div>
+        </div>
+      </div>
+    </div>
+
+    ${b.phone ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 16px 16px;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
+      <div style="background:var(--green);padding:14px">
+        <a href="tel:${esc(b.phone)}" class="bd-call-btn dep" style="text-decoration:none">📞 Anrufen</a>
+      </div>
+      <div style="background:var(--red);padding:14px">
+        <a href="tel:${esc(b.phone)}" class="bd-call-btn arr" style="text-decoration:none">📞 Anrufen</a>
+      </div>
+    </div>` : ''}
+
+    ${b.days || b.price ? `
+    <div class="bd-cost">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">📊 Kostenübersicht</div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span>Parking (${cn}) · ${b.days || '?'} Tage</span>
+        <span style="font-weight:700">${b.price ? b.price.toFixed(2) + '€' : '—'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;padding:6px 0">
+        <span>Gesamt</span>
+        <span>${b.price ? b.price.toFixed(2) + '€' : '—'}</span>
+      </div>
+    </div>` : ''}
+
+    <div style="height:40px"></div>
+  `;
+
+  overlay.classList.add('open');
+}
+
+function closeBookingDetail() {
+  document.getElementById('bookingDetailOverlay').classList.remove('open');
+  currentDetailIdx = -1;
+}
+
+function formatDateNice(d) {
+  if (!d) return '—';
+  try {
+    const date = new Date(d + 'T12:00:00');
+    const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    return `${days[date.getDay()]}. ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  } catch { return d; }
+}
+
+async function doCheckin(idx) {
+  const b = allBookings[idx];
+  if (!b || !b.id) return;
+  try {
+    await fetch('/api/bookings/' + b.id + '/checkin', { method: 'POST', headers: ah(), body: JSON.stringify({}) });
+    b.checked_in_at = new Date().toISOString();
+    b.status = 'checked';
+    showToast('Check-in erfolgreich ✓');
+    openBookingDetail(idx); // refresh
+    renderBookings(allBookings.filter(bb => {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      return !q || (bb.plate || '').toLowerCase().includes(q) || (bb.name || '').toLowerCase().includes(q);
+    }));
+  } catch (e) { showToast('Fehler ⚠️'); }
+}
+
+async function doCheckout(idx) {
+  const b = allBookings[idx];
+  if (!b || !b.id) return;
+  try {
+    await fetch('/api/bookings/' + b.id + '/checkout', { method: 'POST', headers: ah(), body: JSON.stringify({}) });
+    b.checked_out_at = new Date().toISOString();
+    b.status = 'checked';
+    showToast('Check-out erfolgreich ✓');
+    openBookingDetail(idx);
+    renderBookings(allBookings.filter(bb => {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      return !q || (bb.plate || '').toLowerCase().includes(q) || (bb.name || '').toLowerCase().includes(q);
+    }));
+  } catch (e) { showToast('Fehler ⚠️'); }
+}
+
+// ─── Label Editor (opens as modal from detail view) ───────────────────
+function openLabelEditor(idx) {
+  const b = allBookings[idx];
+  if (!b) return;
+  const cn = currentCompany === 'parkking' ? 'Biemann' : 'Hasloh';
+  const content = document.getElementById('modalContent');
+  content.innerHTML = `
+    <div class="modal-title">🖨️ Label drucken <button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="ed-row"><div class="ed-col"><div class="ed-label">Kundenname</div><input class="ed-input" id="en-${idx}" value="${esc(b.name)}" oninput="rl(${idx})"></div></div>
+    <div class="ed-row"><div class="ed-col"><div class="ed-label">Rückgabe Datum</div><input class="ed-input" id="ed-${idx}" value="${esc(b.date_out)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Uhrzeit</div><input class="ed-input" id="et-${idx}" value="${esc(b.time_out)}" oninput="rl(${idx})"></div></div>
+    <div class="ed-row"><div class="ed-col"><div class="ed-label">Fahrzeug</div><input class="ed-input" id="ec-${idx}" value="${esc(b.car)}" oninput="rl(${idx})"></div><div class="ed-col"><div class="ed-label">Kennzeichen</div><input class="ed-input plate" id="ep-${idx}" value="${esc(b.plate)}" oninput="this.value=this.value.toUpperCase();rl(${idx})"></div></div>
+    <div class="ed-row"><div class="ed-col"><div class="ed-label">Stellplatz (optional)</div><input class="ed-input" id="es-${idx}" placeholder="z.B. Straße rechts, Reihe 3..." oninput="rl(${idx})"></div></div>
+    <div class="label-preview"><canvas id="cv-${idx}"></canvas></div>
+    <div class="ed-btns">
+      <button class="btn btn-accent btn-sm" onclick="printL(${idx})">🖨 Drucken</button>
+      <button class="btn btn-white btn-sm" onclick="downloadL(${idx})">📲 Speichern</button>
+      <button class="btn btn-outline btn-sm" onclick="shareL(${idx})">↗ Teilen</button>
+      <button class="btn btn-ghost btn-sm" onclick="saveLabelEdits(${idx})">✓ Fertig</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => rl(idx), 100);
+}
+
+async function saveLabelEdits(idx) {
+  const b = allBookings[idx];
+  if (b && b.id) {
+    const u = {
+      name: document.getElementById('en-' + idx).value.trim(),
+      plate: document.getElementById('ep-' + idx).value.trim().toUpperCase(),
+      car: document.getElementById('ec-' + idx).value.trim(),
+      date_out: document.getElementById('ed-' + idx).value.trim(),
+      time_out: document.getElementById('et-' + idx).value.trim()
+    };
+    try {
+      await fetch('/api/bookings/' + b.id, { method: 'PUT', headers: ah(), body: JSON.stringify(u) });
+      Object.assign(allBookings[idx], u);
+    } catch (e) {
+      await OfflineStore.queueAction({ method: 'PUT', url: '/api/bookings/' + b.id, body: JSON.stringify(u), timestamp: Date.now(), description: 'Buchung bearbeiten' });
       Object.assign(allBookings[idx], u, { _offlineEdited: true });
       showToast('Offline gespeichert ✓');
-      updateSyncBadge();
     }
   }
-  openEditorIdx=-1;const ed=document.getElementById('editor-'+idx);if(ed)ed.classList.remove('open');filterBookings();
+  closeModal();
+  if (currentDetailIdx === idx) openBookingDetail(idx);
+  filterBookings();
 }
 
 // ─── Label rendering (unchanged, works 100% offline) ────────────────────
