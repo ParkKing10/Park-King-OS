@@ -3,7 +3,7 @@
 //  Caches app shell + fonts, proxies API calls through IndexedDB when offline
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'parkking-v5';
+const CACHE_NAME = 'parkking-v6';
 const APP_SHELL = [
   '/',
   '/index.html',
