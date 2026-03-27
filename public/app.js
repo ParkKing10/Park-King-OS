@@ -949,16 +949,35 @@ function renderSchedule(days, data) {
 // ─── Meine Schicht Heute Rendern ──────────────────────────────────────────
 function renderMyShiftToday(shift) {
   const box = document.getElementById('myShiftToday');
-  if (!shift) {
-    box.style.display = 'none';
-    return;
-  }
-  box.style.display = 'block';
+  box.style.display = 'block'; // Immer anzeigen
   const info = document.getElementById('myShiftInfo');
   const actions = document.getElementById('myShiftActions');
   
   const now = new Date();
   const nowTime = now.toTimeString().slice(0, 5);
+  
+  // Fall 1: Keine geplante Schicht - trotzdem Start/Ende möglich
+  if (!shift) {
+    // Prüfe ob es eine aktive ungeplante Schicht gibt
+    const activeShift = localStorage.getItem('activeUnplannedShift');
+    if (activeShift) {
+      const data = JSON.parse(activeShift);
+      info.innerHTML = `
+        <div class="my-shift-time">Ungeplante Schicht</div>
+        <div class="my-shift-status">✅ Gestartet: ${data.start_time}</div>
+      `;
+      actions.innerHTML = `<button class="shift-checkin-btn end" onclick="endUnplannedShift()">🏁 Schicht beenden</button>`;
+    } else {
+      info.innerHTML = `
+        <div class="my-shift-time" style="font-size:14px;color:var(--text2)">Keine Schicht geplant</div>
+        <div class="my-shift-status">Du kannst trotzdem eine Schicht starten</div>
+      `;
+      actions.innerHTML = `<button class="shift-checkin-btn start" onclick="startUnplannedShift()">▶️ Schicht starten</button>`;
+    }
+    return;
+  }
+  
+  // Fall 2: Geplante Schicht
   const [startH, startM] = shift.start_time.split(':').map(Number);
   const scheduledStart = new Date(now); scheduledStart.setHours(startH, startM, 0, 0);
   const isLate = now > scheduledStart && !shift.actual_start;
@@ -967,7 +986,7 @@ function renderMyShiftToday(shift) {
   info.innerHTML = `
     <div class="my-shift-time">${shift.start_time} – ${shift.end_time}</div>
     <div class="my-shift-status">
-      ${shift.actual_start ? `✅ Eingecheckt: ${shift.actual_start}` : ''}
+      ${shift.actual_start ? `✅ Eingecheckt: ${shift.actual_start}` : 'Geplante Schicht'}
       ${shift.actual_end ? ` · Ausgecheckt: ${shift.actual_end}` : ''}
       ${shift.was_late ? ` · ⚠️ Verspätet` : ''}
     </div>
@@ -995,6 +1014,84 @@ function renderMyShiftToday(shift) {
       ${warningHtml}
       <button class="shift-checkin-btn start" onclick="shiftCheckin(${shift.id}, ${isLate})">▶️ Schicht starten</button>
     `;
+  }
+}
+
+// ─── Ungeplante Schicht starten/beenden ───────────────────────────────────
+async function startUnplannedShift() {
+  try {
+    // GPS Check
+    showToast('📍 Standort wird geprüft...');
+    const loc = await checkLocation();
+    if (!loc.ok) {
+      alert(`❌ Du bist nicht am Arbeitsort!\n\nDu bist ${Math.round(loc.distance)}m entfernt.\nCheck-in nur möglich bei: Klövesteen 21, 25474 Hasloh`);
+      return;
+    }
+    
+    const nowTime = new Date().toTimeString().slice(0, 5);
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Erstelle Schicht auf dem Server
+    const r = await fetch('/api/shifts/start-unplanned', { 
+      method: 'POST', 
+      headers: ah(), 
+      body: JSON.stringify({ date: today, start_time: nowTime }) 
+    });
+    const data = await r.json();
+    if (data.error) {
+      showToast(data.error + ' ⚠️');
+      return;
+    }
+    
+    // Speichere lokal
+    localStorage.setItem('activeUnplannedShift', JSON.stringify({
+      id: data.id,
+      start_time: nowTime
+    }));
+    
+    showToast('✅ Schicht gestartet');
+    loadSchedule();
+  } catch (e) {
+    if (e.code === 1) {
+      alert('❌ GPS-Zugriff verweigert!\n\nBitte erlaube den Standortzugriff um einzuchecken.');
+    } else {
+      showToast('Fehler: ' + e.message + ' ⚠️');
+    }
+  }
+}
+
+async function endUnplannedShift() {
+  try {
+    // GPS Check
+    showToast('📍 Standort wird geprüft...');
+    const loc = await checkLocation();
+    if (!loc.ok) {
+      alert(`❌ Du bist nicht am Arbeitsort!\n\nDu bist ${Math.round(loc.distance)}m entfernt.\nCheck-out nur möglich bei: Klövesteen 21, 25474 Hasloh`);
+      return;
+    }
+    
+    const activeShift = localStorage.getItem('activeUnplannedShift');
+    if (!activeShift) {
+      showToast('Keine aktive Schicht ⚠️');
+      return;
+    }
+    const data = JSON.parse(activeShift);
+    
+    const r = await fetch('/api/shifts/' + data.id + '/checkout', { 
+      method: 'POST', 
+      headers: ah() 
+    });
+    const result = await r.json();
+    if (result.error) {
+      showToast(result.error + ' ⚠️');
+      return;
+    }
+    
+    localStorage.removeItem('activeUnplannedShift');
+    showToast('✅ Schicht beendet');
+    loadSchedule();
+  } catch (e) {
+    showToast('Fehler: ' + e.message + ' ⚠️');
   }
 }
 

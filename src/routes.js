@@ -731,6 +731,40 @@ router.delete('/shifts/:id', requireAuth, requireAdmin, (req, res) => {
   res.json({ message: 'Schicht gelöscht' });
 });
 
+// ─── START UNPLANNED SHIFT ───────────────────────────────────────────────
+router.post('/shifts/start-unplanned', requireAuth, (req, res) => {
+  const d = getDb();
+  const { date, start_time } = req.body;
+  
+  if (!date || !start_time) {
+    return res.status(400).json({ error: 'Datum und Startzeit erforderlich' });
+  }
+  
+  // Prüfe ob heute schon eine Schicht existiert
+  const existing = d.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ?').get(req.user.id, date);
+  if (existing) {
+    return res.status(400).json({ error: 'Du hast heute bereits eine Schicht' });
+  }
+  
+  // Erstelle ungeplante Schicht (end_time = start_time, wird beim Checkout aktualisiert)
+  const result = d.prepare(`
+    INSERT INTO shifts (user_id, date, start_time, end_time, actual_start, note, created_by)
+    VALUES (?, ?, ?, ?, ?, 'Ungeplante Schicht', ?)
+  `).run(req.user.id, date, start_time, start_time, start_time, req.user.id);
+  
+  // Log eintragen
+  d.prepare(`
+    INSERT INTO shift_log (shift_id, user_id, action, details)
+    VALUES (?, ?, 'unplanned_start', ?)
+  `).run(result.lastInsertRowid, req.user.id, JSON.stringify({ start_time }));
+  
+  res.json({ 
+    id: result.lastInsertRowid, 
+    message: 'Ungeplante Schicht gestartet',
+    start_time 
+  });
+});
+
 // ─── SHIFT CHECK-IN ──────────────────────────────────────────────────────
 router.post('/shifts/:id/checkin', requireAuth, (req, res) => {
   const d = getDb();
@@ -812,9 +846,10 @@ router.post('/shifts/:id/checkout', requireAuth, (req, res) => {
   d.prepare(`
     UPDATE shifts SET 
       actual_end = ?,
+      end_time = ?,
       updated_at = datetime('now')
     WHERE id = ?
-  `).run(actualTime, id);
+  `).run(actualTime, actualTime, id);
   
   // Log eintragen
   d.prepare(`
