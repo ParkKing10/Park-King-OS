@@ -400,6 +400,15 @@
       <div id="monthlyHours"></div>
     </div>
     <div class="admin-section">
+      <div class="admin-section-title">🔄 Tägliches Scraping (manuell)</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Holt die Buchungen für heute aus der Tagesansicht von ParkingPro. Läuft normalerweise automatisch.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-accent btn-sm" id="dailyScrapePK" onclick="dailyScrape('parkking')">🅿️ Biemann scrapen</button>
+        <button class="btn btn-accent btn-sm" id="dailyScrapePSF" onclick="dailyScrape('psfmsf')">✈️ Hasloh scrapen</button>
+      </div>
+      <div id="dailyScrapeStatus" style="font-size:13px;margin-top:8px;color:var(--text3)"></div>
+    </div>
+    <div class="admin-section">
       <div class="admin-section-title">📥 Jahres-Import (einmalig)</div>
       <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Importiert ALLE Buchungen aus der Jahresansicht von ParkingPro. Nur einmal nötig, danach übernimmt das tägliche Scraping.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">

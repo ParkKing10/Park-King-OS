@@ -446,9 +446,9 @@ function closeBookingDetail() {
 function formatDateNice(d) {
   if (!d) return '—';
   try {
-    let dateStr = d;
-    // Handle DD.MM.YYYY format
-    const dotParts = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    let dateStr = String(d).trim();
+    // Handle DD.MM.YYYY or DD.MM.YYYY HH:MM format
+    const dotParts = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
     if (dotParts) {
       dateStr = `${dotParts[3]}-${dotParts[2].padStart(2,'0')}-${dotParts[1].padStart(2,'0')}`;
     }
@@ -976,6 +976,45 @@ async function uploadMorePhotos(){
     showToast('Fotos hochgeladen ✓');
     closeModal();showDamageDetail(parseInt(damageId));
   }catch(e){showToast('Fehler ⚠️');}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DAILY SCRAPE — Manual trigger
+// ═══════════════════════════════════════════════════════════════════════
+
+async function dailyScrape(companyId) {
+  const statusDiv = document.getElementById('dailyScrapeStatus');
+  const btn = companyId === 'parkking' ? document.getElementById('dailyScrapePK') : document.getElementById('dailyScrapePSF');
+  const companyName = companyId === 'parkking' ? 'Biemann' : 'Hasloh';
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Scrapt...';
+  statusDiv.innerHTML = `<span style="color:var(--accent)">⏳ ${companyName} wird gescrapt...</span>`;
+
+  try {
+    const r = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: ah(),
+      body: JSON.stringify({ company: companyId })
+    });
+    const data = await r.json();
+
+    if (data.error) {
+      statusDiv.innerHTML = `<span style="color:var(--red)">❌ ${data.error}: ${data.detail || ''}</span>`;
+    } else if (data.inProgress) {
+      statusDiv.innerHTML = `<span style="color:var(--orange)">⏳ ${companyName}: Scrape läuft bereits...</span>`;
+    } else {
+      statusDiv.innerHTML = `<span style="color:var(--green)">✅ ${companyName}: ${data.total} Buchungen, ${data.created} neu, ${data.updated} aktualisiert (${Math.round(data.duration / 1000)}s)</span>`;
+      showToast(`${companyName} Scrape fertig ✓`);
+      // Reload bookings if on bookings tab
+      if (currentCompany === companyId) loadBookings(false);
+    }
+  } catch (e) {
+    statusDiv.innerHTML = `<span style="color:var(--red)">❌ Fehler: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = companyId === 'parkking' ? '🅿️ Biemann scrapen' : '✈️ Hasloh scrapen';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -329,11 +329,14 @@ function seedDefaults() {
 function upsertBookingFromScrape(booking, companyId, scrapedDate) {
   const d = getDb();
 
+  // Helper: convert empty strings to null so COALESCE works correctly
+  const n = (v) => (v === '' || v === undefined) ? null : v;
+
   // Check if booking already exists for this date + type
   const bookingType = booking.type === 'checkout' ? 'out' : 'in';
   const existing = d.prepare(
     'SELECT id, status, paid, key_handed_in, phone_contacted, wash_done, comment, shuttle_driver FROM bookings WHERE external_id = ? AND company_id = ? AND scraped_date = ? AND type = ?'
-  ).get(booking.code || booking.uid, companyId, scrapedDate, bookingType);
+  ).get(n(booking.code) || n(booking.uid), companyId, scrapedDate, bookingType);
 
   if (existing) {
     // Update scraped fields but preserve user-edited fields
@@ -356,11 +359,11 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
         updated_at = datetime('now')
       WHERE id = ?
     `).run(
-      booking.name, booking.kennzeichen, booking.fahrzeug, booking.telefon,
-      booking.type === 'checkout' ? null : booking.zeit,
-      booking.type === 'checkout' ? booking.zeit : booking.rueckgabeZeit,
-      booking.parkdatum, booking.rueckgabeDatum,
-      booking.flug, booking.personen ? parseInt(booking.personen) : null,
+      n(booking.name), n(booking.kennzeichen), n(booking.fahrzeug), n(booking.telefon),
+      booking.type === 'checkout' ? null : n(booking.zeit),
+      booking.type === 'checkout' ? n(booking.zeit) : n(booking.rueckgabeZeit),
+      n(booking.parkdatum), n(booking.rueckgabeDatum),
+      n(booking.flug), booking.personen ? parseInt(booking.personen) : null,
       booking.tage ? parseInt(booking.tage) : null,
       booking.price || null,
       null,
@@ -380,15 +383,15 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
       flight_code, days, price, provider, scraped_date
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    booking.code || booking.uid, booking.uid, companyId,
+    n(booking.code) || n(booking.uid), n(booking.uid), companyId,
     isCheckout ? 'out' : 'in',
     'new',
-    booking.name, booking.telefon,
+    n(booking.name), n(booking.telefon),
     booking.personen ? parseInt(booking.personen) : 1,
-    booking.kennzeichen, booking.fahrzeug,
-    booking.parkdatum, isCheckout ? null : booking.zeit,
-    booking.rueckgabeDatum || booking.rueckgabe, isCheckout ? booking.zeit : booking.rueckgabeZeit,
-    booking.flug, booking.tage ? parseInt(booking.tage) : null,
+    n(booking.kennzeichen), n(booking.fahrzeug),
+    n(booking.parkdatum), isCheckout ? null : n(booking.zeit),
+    n(booking.rueckgabeDatum) || n(booking.rueckgabe), isCheckout ? n(booking.zeit) : n(booking.rueckgabeZeit),
+    n(booking.flug), booking.tage ? parseInt(booking.tage) : null,
     booking.price || null,
     'Park King', scrapedDate
   );
