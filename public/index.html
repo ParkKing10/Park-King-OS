@@ -62,11 +62,19 @@
   .date-nav-picker:focus{border-color:var(--accent)}
   .date-nav-arrow{width:40px;height:40px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text2);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);line-height:1}
   .date-nav-arrow:active{background:var(--accent-light);color:var(--accent);border-color:var(--accent)}
-  .search-bar{position:relative;margin-bottom:16px}
+  .search-bar{position:relative;margin-bottom:10px}
   .search-bar input{width:100%;padding:12px 16px 12px 42px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:15px;outline:none;box-shadow:var(--shadow)}
   .search-bar input:focus{border-color:var(--accent)}
   .search-bar input::placeholder{color:var(--text3)}
   .search-bar .si{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;pointer-events:none}
+  .filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+  .filter-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text2);user-select:none}
+  .filter-toggle input{display:none}
+  .filter-toggle-slider{width:36px;height:20px;background:var(--border);border-radius:10px;position:relative;transition:background .2s}
+  .filter-toggle-slider::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+  .filter-toggle input:checked + .filter-toggle-slider{background:var(--accent)}
+  .filter-toggle input:checked + .filter-toggle-slider::after{transform:translateX(16px)}
+  .filter-toggle-label{font-weight:500}
   .status-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .status-chip{padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600}
   .chip-green{background:var(--green-bg);color:var(--green)}
@@ -382,6 +390,13 @@
       <button class="date-nav-arrow" onclick="goDateOffset(1)">›</button>
     </div>
     <div class="search-bar"><span class="si">🔍</span><input type="text" id="searchInput" placeholder="Kennzeichen oder Name suchen..." oninput="filterBookings()"></div>
+    <div class="filter-bar">
+      <label class="filter-toggle">
+        <input type="checkbox" id="hideCheckedFilter" onchange="filterBookings()" checked>
+        <span class="filter-toggle-slider"></span>
+        <span class="filter-toggle-label">Erledigte ausblenden</span>
+      </label>
+    </div>
     <div class="status-bar" id="statusBar"></div>
     <div id="loadingState" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Buchungen werden geladen...</div></div>
     <div id="errorState" class="empty" style="display:none"></div>

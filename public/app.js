@@ -302,10 +302,12 @@ async function loadBookings(refresh){
 
     const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
     const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
+    const checkedIns=allBookings.filter(b=>b.type==='in'&&b.checked_in_at).length;
+    const checkedOuts=allBookings.filter(b=>b.type==='out'&&b.checked_out_at).length;
     const dateLabel=dateStr===today?dateStr:formatDateLabel(dateStr);
-    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateLabel}</div><div class="status-chip chip-green">▶ ${ins} Annahmen</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben</div>`:''}`;
+    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateLabel}</div><div class="status-chip chip-green">▶ ${ins} Annahmen (${checkedIns}✓)</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben (${checkedOuts}✓)</div>`:''}`;
     if(!allBookings.length){er.textContent='Keine Buchungen für '+dateLabel+'.';er.style.display='block';return;}
-    renderBookings(allBookings);showToast(allBookings.length+' Buchungen geladen ✓');
+    filterBookings();showToast(allBookings.length+' Buchungen geladen ✓');
   }catch(e){
     // Network error fallback
     const cached = await OfflineStore.getCachedBookings(currentCompany, dateStr);
@@ -315,7 +317,7 @@ async function loadBookings(refresh){
       const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
       const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
       document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateStr}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Cache</div><div class="status-chip chip-green">▶ ${ins}</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs}</div>`:''}`;
-      renderBookings(allBookings);
+      filterBookings();
       showToast('Offline-Cache geladen');
     } else {
       er.innerHTML=`<div style="margin-bottom:8px">⚠️ ${e.message||'Verbindungsfehler'}</div><button class="btn btn-accent btn-sm" onclick="loadBookings(true)">Nochmal</button>`;
@@ -326,7 +328,33 @@ async function loadBookings(refresh){
 
 function formatDateLabel(d){const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
 
-function filterBookings(){const q=document.getElementById('searchInput').value.trim().toLowerCase();const f=q?allBookings.filter(b=>(b.plate||'').toLowerCase().includes(q)||(b.name||'').toLowerCase().includes(q)):allBookings;renderBookings(f);}
+function filterBookings(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const hideChecked = document.getElementById('hideCheckedFilter')?.checked ?? true;
+  
+  let filtered = allBookings;
+  
+  // Textsuche
+  if (q) {
+    filtered = filtered.filter(b => 
+      (b.plate || '').toLowerCase().includes(q) || 
+      (b.name || '').toLowerCase().includes(q)
+    );
+  }
+  
+  // Erledigte ausblenden (Check-in bei Annahmen, Check-out bei Rückgaben)
+  if (hideChecked) {
+    filtered = filtered.filter(b => {
+      if (b.type === 'in') {
+        return !b.checked_in_at; // Annahme: ausblenden wenn eingecheckt
+      } else {
+        return !b.checked_out_at; // Rückgabe: ausblenden wenn ausgecheckt
+      }
+    });
+  }
+  
+  renderBookings(filtered);
+}
 function markPrinted(idx){const b=allBookings[idx];if(b&&b.id){printedIds[b.id]=true;localStorage.setItem('pp_printed',JSON.stringify(printedIds));}}
 
 function renderBookings(list){
