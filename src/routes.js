@@ -181,6 +181,30 @@ router.get('/bookings/:id', requireAuth, (req, res) => {
   res.json({ booking, log });
 });
 
+// ─── BOOKING LOG (separate endpoint) ─────────────────────────────────────
+router.get('/bookings/:id/log', requireAuth, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  const logs = d.prepare(`
+    SELECT l.*, u.display_name 
+    FROM booking_log l 
+    LEFT JOIN users u ON l.user_id = u.id 
+    WHERE l.booking_id = ? 
+    ORDER BY l.created_at DESC
+    LIMIT 50
+  `).all(id);
+  res.json(logs);
+});
+
+// ─── LOG ACTION (for frontend actions like label print) ──────────────────
+router.post('/bookings/:id/log-action', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { action, details } = req.body;
+  if (!action) return res.status(400).json({ error: 'Action erforderlich' });
+  addLog(id, action, details || null, req.user.id);
+  res.json({ message: 'Logged' });
+});
+
 router.put('/bookings/:id', requireAuth, (req, res) => {
   const d = getDb();
   const id = parseInt(req.params.id);

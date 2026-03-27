@@ -505,10 +505,75 @@ function openBookingDetail(idx) {
       <a href="tel:${esc(b.phone)}" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--blue);font-size:15px;font-weight:700;text-decoration:none;box-shadow:var(--shadow)">📞 ${esc(b.phone)}</a>
     </div>` : ''}
 
+    <!-- Aktivitäts-Log -->
+    <div class="bd-log-section">
+      <div class="bd-log-header">📋 Aktivitäten</div>
+      <div class="bd-log-list" id="bookingLogList">
+        <div class="bd-log-loading">Lade...</div>
+      </div>
+    </div>
+
     <div style="height:40px"></div>
   `;
 
   overlay.classList.add('open');
+  
+  // Lade das Log
+  loadBookingLog(b.id);
+}
+
+async function loadBookingLog(bookingId) {
+  const logList = document.getElementById('bookingLogList');
+  try {
+    const r = await fetch('/api/bookings/' + bookingId + '/log', { headers: ah() });
+    if (!r.ok) throw new Error('Fehler');
+    const logs = await r.json();
+    
+    if (!logs.length) {
+      logList.innerHTML = '<div class="bd-log-empty">Keine Aktivitäten</div>';
+      return;
+    }
+    
+    const actionLabels = {
+      'checked_in': '✅ Eingecheckt',
+      'checked_out': '✅ Ausgecheckt',
+      'undo_checkin': '↩️ Check-in rückgängig',
+      'undo_checkout': '↩️ Check-out rückgängig',
+      'label_printed': '🖨️ Label gedruckt',
+      'status_changed': '📍 Status geändert',
+      'edited': '✏️ Bearbeitet',
+      'created': '➕ Erstellt',
+      'paid': '💰 Bezahlt',
+      'noshow': '❌ No-Show',
+      'key_in': '🔑 Schlüssel abgegeben',
+      'key_out': '🔑 Schlüssellos',
+      'phone_called': '📞 Angerufen'
+    };
+    
+    logList.innerHTML = logs.map(log => {
+      const time = log.created_at ? new Date(log.created_at).toLocaleString('de-DE', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      }) : '';
+      const action = actionLabels[log.action] || log.action;
+      const user = log.display_name || 'System';
+      let details = '';
+      if (log.details) {
+        try {
+          const d = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+          if (d.status) details = ` (${d.status})`;
+          if (d.checkin_status) details = ` → ${d.checkin_status}`;
+          if (d.checkout_status) details = ` → ${d.checkout_status}`;
+        } catch {}
+      }
+      return `<div class="bd-log-item">
+        <div class="bd-log-action">${action}${details}</div>
+        <div class="bd-log-meta">${user} · ${time}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    logList.innerHTML = '<div class="bd-log-empty">Log nicht verfügbar</div>';
+  }
 }
 
 function closeBookingDetail() {
@@ -723,6 +788,15 @@ rc.toBlob(blob=>{
   setTimeout(()=>URL.revokeObjectURL(url),5000);
   // Also save to IndexedDB for offline label history
   OfflineStore.saveLabel(allBookings[i]?.id, p, rc.toDataURL('image/png')).catch(()=>{});
+  // Log label print
+  const b = allBookings[i];
+  if (b && b.id) {
+    fetch('/api/bookings/' + b.id + '/log-action', { 
+      method: 'POST', 
+      headers: ah(), 
+      body: JSON.stringify({ action: 'label_printed' }) 
+    }).catch(() => {});
+  }
   showToast('Label gespeichert → aus Fotos drucken ✓');
 },'image/png');}
 
