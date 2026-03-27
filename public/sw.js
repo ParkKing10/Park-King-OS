@@ -3,7 +3,7 @@
 //  Network-first für App-Dateien, Cache nur als Fallback offline
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'parkking-v8';
+const CACHE_NAME = 'parkking-v9';
 const APP_SHELL = [
   '/',
   '/index.html',
