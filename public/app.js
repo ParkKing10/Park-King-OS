@@ -305,7 +305,7 @@ async function loadBookings(refresh){
     const checkedIns=allBookings.filter(b=>b.type==='in'&&b.checked_in_at).length;
     const checkedOuts=allBookings.filter(b=>b.type==='out'&&b.checked_out_at).length;
     const dateLabel=dateStr===today?dateStr:formatDateLabel(dateStr);
-    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateLabel}</div><div class="status-chip chip-green">▶ ${ins} Annahmen (${checkedIns}✓)</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben (${checkedOuts}✓)</div>`:''}`;
+    document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-green">▶ ${ins} Annahmen (${checkedIns}✓)</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs} Rückgaben (${checkedOuts}✓)</div>`:''}`;
     if(!allBookings.length){er.textContent='Keine Buchungen für '+dateLabel+'.';er.style.display='block';return;}
     filterBookings();showToast(allBookings.length+' Buchungen geladen ✓');
   }catch(e){
@@ -316,7 +316,7 @@ async function loadBookings(refresh){
       allBookings = cached.bookings;
       const cn=currentCompany==='parkking'?'Biemann':'Hasloh';
       const ins=allBookings.filter(b=>b.type==='in').length,outs=allBookings.filter(b=>b.type==='out').length;
-      document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip chip-blue">${dateStr}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Cache</div><div class="status-chip chip-green">▶ ${ins}</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs}</div>`:''}`;
+      document.getElementById('statusBar').innerHTML=`<div class="status-chip chip-company">${cn}</div><div class="status-chip" style="background:var(--orange-bg);color:var(--orange)">📴 Cache</div><div class="status-chip chip-green">▶ ${ins}</div>${outs?`<div class="status-chip" style="background:var(--red-bg);color:var(--red)">◀ ${outs}</div>`:''}`;
       filterBookings();
       showToast('Offline-Cache geladen');
     } else {
