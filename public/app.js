@@ -258,13 +258,10 @@ async function loadBookings(refresh){
   updateDatePicker();
   const today=new Date().toISOString().split('T')[0];
 
-  // Try scrape first if refresh requested and online and looking at today
-  if(refresh && !isOffline && dateStr===today){
-    try{await fetch('/api/scrape',{method:'POST',headers:ah(),body:JSON.stringify({company:currentCompany})});}catch(e){}
-  }
-
   try{
-    const r=await fetch('/api/bookings?company='+currentCompany+'&date='+dateStr,{headers:ah()});
+    // Cache-Busting bei refresh
+    const url = '/api/bookings?company='+currentCompany+'&date='+dateStr + (refresh ? '&t='+Date.now() : '');
+    const r=await fetch(url,{headers:ah()});
 
     // Check if offline response from SW
     const isOfflineResp = r.headers && r.headers.get('X-Offline') === 'true';
