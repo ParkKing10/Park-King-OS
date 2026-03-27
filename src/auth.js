@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const { getDb } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'parkking-os-secret-change-me';
-const TOKEN_EXPIRY = '24h';
+const TOKEN_EXPIRY = '30d'; // 30 Tage eingeloggt bleiben
 
 // ─── Generate token ─────────────────────────────────────────────────────
 
