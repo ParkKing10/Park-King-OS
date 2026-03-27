@@ -191,7 +191,8 @@ router.put('/bookings/:id', requireAuth, (req, res) => {
   const allowed = ['name', 'phone', 'email', 'pax', 'plate', 'car', 'key_code',
     'key_handed_in', 'km_in', 'km_out', 'date_in', 'time_in', 'date_out', 'time_out',
     'flight_code', 'flight_sched', 'flight_live', 'provider', 'days', 'price',
-    'wash', 'wash_done', 'comment', 'phone_contacted', 'shuttle_driver', 'shuttle_status', 'type', 'status'];
+    'wash', 'wash_done', 'comment', 'phone_contacted', 'shuttle_driver', 'shuttle_status', 'type', 'status',
+    'checkin_status', 'checkout_status'];
 
   for (const key of allowed) {
     if (b[key] !== undefined) {
@@ -272,6 +273,36 @@ router.delete('/bookings/:id/checkout', requireAuth, requireAdmin, (req, res) =>
     WHERE id = ?`).run(id);
   addLog(id, 'undo_checkout', { by: req.user.display_name }, req.user.id);
   res.json({ message: 'Check-out rückgängig gemacht' });
+});
+
+// ─── SET STATUS (separate from check-in/out) ─────────────────────────────
+router.put('/bookings/:id/status', requireAuth, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  const { checkin_status, checkout_status } = req.body;
+  
+  const updates = [];
+  const params = [];
+  
+  if (checkin_status !== undefined) {
+    updates.push('checkin_status = ?');
+    params.push(checkin_status);
+  }
+  if (checkout_status !== undefined) {
+    updates.push('checkout_status = ?');
+    params.push(checkout_status);
+  }
+  
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'Kein Status angegeben' });
+  }
+  
+  updates.push("updated_at = datetime('now')");
+  params.push(id);
+  
+  d.prepare(`UPDATE bookings SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  addLog(id, 'status_changed', { checkin_status, checkout_status, by: req.user.display_name }, req.user.id);
+  res.json({ message: 'Status aktualisiert' });
 });
 
 router.post('/bookings/:id/pay', requireAuth, (req, res) => {

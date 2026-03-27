@@ -429,12 +429,11 @@ function openBookingDetail(idx) {
         <div class="bd-date-time">${esc(b.time_in) || '—'}</div>
         ${checkedIn ? `
           <div class="bd-checked-info">
-            <div style="color:var(--green);font-weight:700;font-size:13px">✅ Eingecheckt: ${checkinTime}</div>
-            ${b.checkin_status ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">${checkinStatusLabels[b.checkin_status] || b.checkin_status}</div>` : ''}
+            <div style="color:#fff;font-weight:700;font-size:13px">✅ Eingecheckt: ${checkinTime}</div>
           </div>
           ${isAdmin ? `<button class="bd-undo-btn" onclick="undoCheckin(${idx})">↩️ Rückgängig</button>` : ''}
         ` : `
-          <button class="bd-check-btn checkin" onclick="openCheckinModal(${idx})">☐ Check-in</button>
+          <button class="bd-check-btn checkin" onclick="doCheckin(${idx})">☐ Check-in</button>
         `}
       </div>
       <div class="bd-date-col departure">
@@ -443,13 +442,43 @@ function openBookingDetail(idx) {
         <div class="bd-date-time">${esc(b.time_out) || '—'}</div>
         ${checkedOut ? `
           <div class="bd-checked-info">
-            <div style="color:var(--green);font-weight:700;font-size:13px">✅ Ausgecheckt: ${checkoutTime}</div>
-            ${b.checkout_status ? `<div style="font-size:12px;color:var(--text2);margin-top:2px">${checkoutStatusLabels[b.checkout_status] || b.checkout_status}</div>` : ''}
+            <div style="color:#fff;font-weight:700;font-size:13px">✅ Ausgecheckt: ${checkoutTime}</div>
           </div>
           ${isAdmin ? `<button class="bd-undo-btn" onclick="undoCheckout(${idx})">↩️ Rückgängig</button>` : ''}
         ` : `
-          <button class="bd-check-btn checkout" onclick="openCheckoutModal(${idx})">☐ Check-out</button>
+          <button class="bd-check-btn checkout" onclick="doCheckout(${idx})">☐ Check-out</button>
         `}
+      </div>
+    </div>
+
+    <!-- STATUS SECTION -->
+    <div class="bd-status-section">
+      <div class="bd-status-header">📍 Kunden-Status</div>
+      <div class="bd-status-grid">
+        <div class="bd-status-col">
+          <div class="bd-status-label">Check-in Status</div>
+          ${b.checkin_status ? `
+            <div class="bd-status-active ${b.checkin_status}">${checkinStatusLabels[b.checkin_status] || b.checkin_status}</div>
+            ${isAdmin ? `<button class="bd-status-clear" onclick="clearCheckinStatus(${idx})">✕ Löschen</button>` : ''}
+          ` : `
+            <div class="bd-status-btns">
+              <button class="bd-status-btn" onclick="setCheckinStatus(${idx}, 'angerufen_unterwegs')">📞 Unterwegs</button>
+              <button class="bd-status-btn" onclick="setCheckinStatus(${idx}, 'wartet_parkplatz')">🅿️ Wartet</button>
+            </div>
+          `}
+        </div>
+        <div class="bd-status-col">
+          <div class="bd-status-label">Check-out Status</div>
+          ${b.checkout_status ? `
+            <div class="bd-status-active ${b.checkout_status}">${checkoutStatusLabels[b.checkout_status] || b.checkout_status}</div>
+            ${isAdmin ? `<button class="bd-status-clear" onclick="clearCheckoutStatus(${idx})">✕ Löschen</button>` : ''}
+          ` : `
+            <div class="bd-status-btns">
+              <button class="bd-status-btn" onclick="setCheckoutStatus(${idx}, 'gelandet_gepaeck')">✈️ Gelandet</button>
+              <button class="bd-status-btn urgent" onclick="setCheckoutStatus(${idx}, 'terminal2_sofort')">🚨 T2 Sofort!</button>
+            </div>
+          `}
+        </div>
       </div>
     </div>
 
@@ -504,59 +533,13 @@ function formatDateNice(d) {
   } catch { return d; }
 }
 
-// ─── Check-in Modal ───────────────────────────────────────────────────
-function openCheckinModal(idx) {
-  const b = allBookings[idx];
-  if (!b) return;
-  const content = document.getElementById('modalContent');
-  content.innerHTML = `
-    <div class="modal-title">🚗 Check-in <button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div style="font-size:14px;color:var(--text2);margin-bottom:16px">${esc(b.name)} · ${esc(b.plate)}</div>
-    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text3)">Status wählen:</div>
-    <div class="checkin-options">
-      <button class="checkin-option-btn" onclick="doCheckinWithStatus(${idx}, 'angerufen_unterwegs')">
-        <span class="checkin-icon">📞</span>
-        <span class="checkin-label">Hat angerufen & auf m Weg</span>
-      </button>
-      <button class="checkin-option-btn" onclick="doCheckinWithStatus(${idx}, 'wartet_parkplatz')">
-        <span class="checkin-icon">🅿️</span>
-        <span class="checkin-label">Wartet auf dem Parkplatz</span>
-      </button>
-    </div>
-  `;
-  document.getElementById('modalOverlay').classList.add('open');
-}
-
-function openCheckoutModal(idx) {
-  const b = allBookings[idx];
-  if (!b) return;
-  const content = document.getElementById('modalContent');
-  content.innerHTML = `
-    <div class="modal-title">🚗 Check-out <button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div style="font-size:14px;color:var(--text2);margin-bottom:16px">${esc(b.name)} · ${esc(b.plate)}</div>
-    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text3)">Status wählen:</div>
-    <div class="checkout-options">
-      <button class="checkout-option-btn" onclick="doCheckoutWithStatus(${idx}, 'gelandet_gepaeck')">
-        <span class="checkout-icon">✈️</span>
-        <span class="checkout-label">Gelandet & wartet auf Gepäck</span>
-      </button>
-      <button class="checkout-option-btn urgent" onclick="doCheckoutWithStatus(${idx}, 'terminal2_sofort')">
-        <span class="checkout-icon">🚨</span>
-        <span class="checkout-label">Terminal 2 - Sofort abholen!</span>
-      </button>
-    </div>
-  `;
-  document.getElementById('modalOverlay').classList.add('open');
-}
-
-async function doCheckinWithStatus(idx, status) {
+// ─── Direct Check-in/Check-out (ohne Modal) ────────────────────────────
+async function doCheckin(idx) {
   const b = allBookings[idx];
   if (!b || !b.id) return;
-  closeModal();
   try {
-    await fetch('/api/bookings/' + b.id + '/checkin', { method: 'POST', headers: ah(), body: JSON.stringify({ status }) });
+    await fetch('/api/bookings/' + b.id + '/checkin', { method: 'POST', headers: ah(), body: JSON.stringify({}) });
     b.checked_in_at = new Date().toISOString();
-    b.checkin_status = status;
     b.status = 'checked';
     showToast('Check-in erfolgreich ✓');
     openBookingDetail(idx);
@@ -564,16 +547,63 @@ async function doCheckinWithStatus(idx, status) {
   } catch (e) { showToast('Fehler ⚠️'); }
 }
 
-async function doCheckoutWithStatus(idx, status) {
+async function doCheckout(idx) {
   const b = allBookings[idx];
   if (!b || !b.id) return;
-  closeModal();
   try {
-    await fetch('/api/bookings/' + b.id + '/checkout', { method: 'POST', headers: ah(), body: JSON.stringify({ status }) });
+    await fetch('/api/bookings/' + b.id + '/checkout', { method: 'POST', headers: ah(), body: JSON.stringify({}) });
     b.checked_out_at = new Date().toISOString();
-    b.checkout_status = status;
     b.status = 'checked';
     showToast('Check-out erfolgreich ✓');
+    openBookingDetail(idx);
+    filterBookings();
+  } catch (e) { showToast('Fehler ⚠️'); }
+}
+
+// ─── Status setzen (separat von Check-in/out) ──────────────────────────
+async function setCheckinStatus(idx, status) {
+  const b = allBookings[idx];
+  if (!b || !b.id) return;
+  try {
+    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkin_status: status }) });
+    b.checkin_status = status;
+    showToast('Status gesetzt ✓');
+    openBookingDetail(idx);
+    filterBookings();
+  } catch (e) { showToast('Fehler ⚠️'); }
+}
+
+async function setCheckoutStatus(idx, status) {
+  const b = allBookings[idx];
+  if (!b || !b.id) return;
+  try {
+    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkout_status: status }) });
+    b.checkout_status = status;
+    showToast('Status gesetzt ✓');
+    openBookingDetail(idx);
+    filterBookings();
+  } catch (e) { showToast('Fehler ⚠️'); }
+}
+
+async function clearCheckinStatus(idx) {
+  const b = allBookings[idx];
+  if (!b || !b.id) return;
+  try {
+    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkin_status: null }) });
+    b.checkin_status = null;
+    showToast('Status gelöscht ✓');
+    openBookingDetail(idx);
+    filterBookings();
+  } catch (e) { showToast('Fehler ⚠️'); }
+}
+
+async function clearCheckoutStatus(idx) {
+  const b = allBookings[idx];
+  if (!b || !b.id) return;
+  try {
+    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkout_status: null }) });
+    b.checkout_status = null;
+    showToast('Status gelöscht ✓');
     openBookingDetail(idx);
     filterBookings();
   } catch (e) { showToast('Fehler ⚠️'); }
