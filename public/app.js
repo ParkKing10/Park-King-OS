@@ -385,7 +385,6 @@ function openBookingDetail(idx) {
         <div class="bd-date-header">🚗 Parkdatum</div>
         <div class="bd-date-val">${b.date_in ? formatDateNice(b.date_in) : '—'}</div>
         <div class="bd-date-time">${esc(b.time_in) || '—'}</div>
-        <div class="bd-date-km">Km-Stand: ${b.km_in || 0}</div>
         <button class="bd-check-btn checkin ${checkedIn ? 'done' : ''}" onclick="${checkedIn ? '' : `doCheckin(${idx})`}" ${checkedIn ? 'disabled' : ''}>
           ${checkedIn ? `✅ Eingecheckt: ${checkinTime}` : '☐ Check-in'}
         </button>
@@ -394,7 +393,6 @@ function openBookingDetail(idx) {
         <div class="bd-date-header">🚗 Datum Retour</div>
         <div class="bd-date-val">${b.date_out ? formatDateNice(b.date_out) : '—'}</div>
         <div class="bd-date-time">${esc(b.time_out) || '—'}</div>
-        <div class="bd-date-km">Km-Stand: ${b.km_out || 0}</div>
         <button class="bd-check-btn checkout" onclick="doCheckout(${idx})" ${checkedOut ? 'disabled' : ''}>
           ${checkedOut ? '✅ Ausgecheckt' : '☐ Check-out'}
         </button>
@@ -417,26 +415,21 @@ function openBookingDetail(idx) {
     </div>
 
     ${b.phone ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 16px 16px;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
-      <div style="background:var(--green);padding:14px">
-        <a href="tel:${esc(b.phone)}" class="bd-call-btn dep" style="text-decoration:none">📞 Anrufen</a>
-      </div>
-      <div style="background:var(--red);padding:14px">
-        <a href="tel:${esc(b.phone)}" class="bd-call-btn arr" style="text-decoration:none">📞 Anrufen</a>
-      </div>
+    <div style="margin:0 16px 16px">
+      <a href="tel:${esc(b.phone)}" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--blue);font-size:15px;font-weight:700;text-decoration:none;box-shadow:var(--shadow)">📞 ${esc(b.phone)}</a>
     </div>` : ''}
 
-    ${b.days || b.price ? `
+    ${b.days ? `
     <div class="bd-cost">
       <div style="font-size:13px;font-weight:700;margin-bottom:8px">📊 Kostenübersicht</div>
       <div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span>Parking (${cn}) · ${b.days || '?'} Tage</span>
+        <span>Parking (${cn}) · ${b.days} Tage</span>
         <span style="font-weight:700">${b.price ? b.price.toFixed(2) + '€' : '—'}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;padding:6px 0">
+      ${b.price ? `<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;padding:6px 0">
         <span>Gesamt</span>
-        <span>${b.price ? b.price.toFixed(2) + '€' : '—'}</span>
-      </div>
+        <span>${b.price.toFixed(2)}€</span>
+      </div>` : ''}
     </div>` : ''}
 
     <div style="height:40px"></div>
@@ -453,7 +446,17 @@ function closeBookingDetail() {
 function formatDateNice(d) {
   if (!d) return '—';
   try {
-    const date = new Date(d + 'T12:00:00');
+    let dateStr = d;
+    // Handle DD.MM.YYYY format
+    const dotParts = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dotParts) {
+      dateStr = `${dotParts[3]}-${dotParts[2].padStart(2,'0')}-${dotParts[1].padStart(2,'0')}`;
+    }
+    // Handle YYYY-MM-DD (may have time appended)
+    const isoParts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!isoParts) return d;
+    const date = new Date(parseInt(isoParts[1]), parseInt(isoParts[2]) - 1, parseInt(isoParts[3]));
+    if (isNaN(date.getTime())) return d;
     const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
     return `${days[date.getDay()]}. ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
