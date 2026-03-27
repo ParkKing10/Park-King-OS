@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Park King OS — Service Worker (PWA + Offline)
-//  Caches app shell + fonts, proxies API calls through IndexedDB when offline
+//  Network-first für App-Dateien, Cache nur als Fallback offline
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'parkking-v6';
+const CACHE_NAME = 'parkking-v7';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -17,9 +17,9 @@ const APP_SHELL = [
 
 const FONT_CACHE = 'parkking-fonts-v1';
 
-// ─── Install: cache app shell ───────────────────────────────────────────
+// ─── Install: cache app shell, skip waiting sofort ────────────────────────
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing...');
+  console.log('[SW] Installing v7...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
@@ -27,17 +27,23 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// ─── Activate: clean old caches ─────────────────────────────────────────
+// ─── Activate: clean old caches, claim clients sofort ─────────────────────
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
+  console.log('[SW] Activating v7...');
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
         keys
           .filter(k => k !== CACHE_NAME && k !== FONT_CACHE)
-          .map(k => caches.delete(k))
+          .map(k => { console.log('[SW] Deleting old cache:', k); return caches.delete(k); })
       )
     ).then(() => self.clients.claim())
+     .then(() => {
+       // Alle offenen Tabs neu laden
+       self.clients.matchAll({ type: 'window' }).then(clients => {
+         clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
+       });
+     })
   );
 });
 
@@ -122,25 +128,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ── App shell: cache-first ──
+  // ── App shell: NETWORK-FIRST (immer aktuelle Version holen) ──
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // Cache new static assets
+    fetch(event.request)
+      .then(response => {
+        // Aktualisiere Cache mit neuer Version
         if (response.ok && event.request.method === 'GET') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => {
-        // Fallback to index.html for SPA navigation
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-        return new Response('Offline', { status: 503 });
-      });
-    })
+      })
+      .catch(() => {
+        // Offline: aus Cache laden
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          // Fallback für navigation requests
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return new Response('Offline', { status: 503 });
+        });
+      })
   );
 });
 

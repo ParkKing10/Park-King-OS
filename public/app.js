@@ -13,13 +13,37 @@ let currentBookingDate = new Date().toISOString().split('T')[0];
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(reg => {
     console.log('[App] SW registered');
+    
+    // Check for updates alle 30 Sekunden
+    setInterval(() => reg.update(), 30000);
+    
+    // Wenn neuer SW wartet, sofort aktivieren
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          console.log('[App] Neue Version verfügbar, lade neu...');
+          location.reload();
+        }
+      });
+    });
+    
     // Listen for SW messages
     navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    
     // Request periodic sync if available
     if ('periodicSync' in reg) {
       reg.periodicSync.register('parkking-refresh', { minInterval: 60 * 60 * 1000 }).catch(() => {});
     }
   }).catch(e => console.warn('[App] SW registration failed:', e));
+  
+  // Reload wenn SW Update-Message schickt
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'UPDATE_AVAILABLE') {
+      console.log('[App] Update verfügbar, lade neu...');
+      location.reload();
+    }
+  });
 }
 
 // ─── Online/Offline Detection ───────────────────────────────────────────
