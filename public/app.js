@@ -874,14 +874,18 @@ function renderDamages(list){
 }
 
 async function showDamageDetail(id){
+  try{document.getElementById('dmgSearch').closest('.dmg-search').style.display='none';}catch(e){}
+  try{document.querySelector('.dmg-top').style.display='none';}catch(e){}
   document.getElementById('dmgList').innerHTML='';
-  try{document.getElementById('dmgSearch').closest('.dmg-search').style.display='none';document.querySelector('.dmg-top').style.display='none';}catch(e){}
   const detail=document.getElementById('dmgDetail');
   detail.style.display='block';
-  detail.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  detail.innerHTML='<div class="loading" style="display:flex"><div class="spinner"></div><div class="loading-text">Wird geladen...</div></div>';
   try{
-    const r=await fetch('/api/damages/'+id,{headers:ah()});const data=await r.json();
+    const r=await fetch('/api/damages/'+id,{headers:ah()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const data=await r.json();
     const d=data.damage,photos=data.photos||[];
+    if(!d) throw new Error('Schaden nicht gefunden');
     const statusLabels={open:'Offen',in_progress:'In Bearbeitung',closed:'Erledigt'};
     const isAdmin=currentUser&&currentUser.role==='admin';
     detail.innerHTML=`
@@ -900,6 +904,9 @@ async function showDamageDetail(id){
         ${isAdmin?`<div style="display:flex;gap:8px;margin-top:12px">
           <select class="form-input" id="dmgStatusSel" style="flex:1"><option value="open" ${d.status==='open'?'selected':''}>Offen</option><option value="in_progress" ${d.status==='in_progress'?'selected':''}>In Bearbeitung</option><option value="closed" ${d.status==='closed'?'selected':''}>Erledigt</option></select>
           <button class="btn btn-accent btn-sm" onclick="updateDamageStatus(${d.id})">Status ändern</button>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn btn-sm" style="background:var(--red);color:#fff;width:100%" onclick="deleteDamage(${d.id},'${esc(d.damage_number)}')">🗑 Schaden löschen</button>
         </div>`:''}
       </div>
       <div class="dmg-detail" style="margin-top:0">
@@ -917,7 +924,19 @@ async function showDamageDetail(id){
         <div style="font-size:12px;color:var(--text3)">Schadensnummer für den Kunden:</div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;color:var(--red);margin-top:4px;text-align:center;padding:8px;background:var(--surface);border-radius:8px;border:1.5px solid var(--border)">${esc(d.damage_number)}</div>
       </div>`;
-  }catch(e){detail.innerHTML='<div class="task-empty">⚠️ Fehler beim Laden</div>';}
+  }catch(e){
+    detail.innerHTML=`<button class="btn btn-ghost" onclick="loadDamages()" style="margin-bottom:12px">← Zurück zur Liste</button><div class="task-empty">⚠️ Fehler beim Laden: ${e.message}</div>`;
+  }
+}
+
+async function deleteDamage(id, number) {
+  if (!confirm(`Schaden ${number} wirklich löschen?\n\nDas kann nicht rückgängig gemacht werden.`)) return;
+  try {
+    const r = await fetch('/api/damages/' + id, { method: 'DELETE', headers: ah() });
+    if (!r.ok) throw new Error('Fehler');
+    showToast('Schaden gelöscht ✓');
+    loadDamages();
+  } catch (e) { showToast('Fehler beim Löschen ⚠️'); }
 }
 
 async function updateDamageStatus(id){

@@ -745,6 +745,17 @@ router.put('/damages/:id', requireAuth, (req, res) => {
   res.json({ message: 'Schaden aktualisiert' });
 });
 
+// Delete damage (admin only)
+router.delete('/damages/:id', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  const damage = d.prepare('SELECT id FROM damages WHERE id = ?').get(id);
+  if (!damage) return res.status(404).json({ error: 'Schaden nicht gefunden' });
+  d.prepare('DELETE FROM damage_photos WHERE damage_id = ?').run(id);
+  d.prepare('DELETE FROM damages WHERE id = ?').run(id);
+  res.json({ message: 'Schaden gelöscht' });
+});
+
 // Upload photos to damage
 router.post('/damages/:id/photos', requireAuth, upload.array('photos', 10), (req, res) => {
   const d = getDb();
