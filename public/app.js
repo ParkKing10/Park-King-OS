@@ -356,13 +356,16 @@ function renderBookings(list){
     const checked=b.status==='checked';
     const providerTag=b.provider&&b.provider!=='Park King'?`<span class="bcard-badge provider">${esc(b.provider)}</span>`:'';
     
-    // Status-Badge für Check-in/Check-out
-    const activeStatus = isIn ? b.checkin_status : b.checkout_status;
-    const statusTag = activeStatus && statusLabels[activeStatus] 
-      ? `<div class="bcard-status-tag" style="background:${statusColors[activeStatus]};color:#fff">${statusLabels[activeStatus]}</div>` 
-      : '';
+    // Status-Tags für beide: Check-in UND Check-out
+    let statusTags = '';
+    if (b.checkin_status && statusLabels[b.checkin_status]) {
+      statusTags += `<div class="bcard-status-tag" style="background:${statusColors[b.checkin_status]};color:#fff">${statusLabels[b.checkin_status]}</div>`;
+    }
+    if (b.checkout_status && statusLabels[b.checkout_status]) {
+      statusTags += `<div class="bcard-status-tag" style="background:${statusColors[b.checkout_status]};color:#fff">${statusLabels[b.checkout_status]}</div>`;
+    }
     
-    return`<div class="bcard type-${isIn?'in':'out'}${checked?' checked':''}" style="animation-delay:${Math.min(i,20)*0.02}s"><div class="bcard-row" onclick="openBookingDetail(${idx})"><div class="bcard-time">${checked?'<div class="bt-checked">✔</div>':''}<div class="bt-icon">🚐</div><div class="bt-time">${esc(time)||'—'}</div>${flight?`<div class="bt-flight">${esc(flight)}</div>`:''}</div><div class="bcard-body"><div class="bcard-top"><span class="bcard-badge pk">${cn}</span>${providerTag}${statusTag}</div><div><span class="bcard-plate">${esc(b.plate)||'—'}</span>${b.external_id?`<span class="bcard-code">#${esc(b.external_id)}</span>`:''}</div><div class="bcard-name">${esc(b.name)||'—'}</div>${b.car?`<div class="bcard-meta">🚗 ${esc(b.car)}</div>`:''}</div><div class="bcard-right">${b.pax?`<div class="bcard-pax">${b.pax} 👥</div>`:''}${printed?'<div class="bcard-printed">🖨</div>':''}${b.price?`<div class="bcard-price">${b.price.toFixed(2)}€</div>`:'<div class="bcard-price">0,00€</div>'}</div></div></div>`;
+    return`<div class="bcard type-${isIn?'in':'out'}${checked?' checked':''}" style="animation-delay:${Math.min(i,20)*0.02}s"><div class="bcard-row" onclick="openBookingDetail(${idx})"><div class="bcard-time">${checked?'<div class="bt-checked">✔</div>':''}<div class="bt-icon">🚐</div><div class="bt-time">${esc(time)||'—'}</div>${flight?`<div class="bt-flight">${esc(flight)}</div>`:''}</div><div class="bcard-body"><div class="bcard-top"><span class="bcard-badge pk">${cn}</span>${providerTag}${statusTags}</div><div><span class="bcard-plate">${esc(b.plate)||'—'}</span>${b.external_id?`<span class="bcard-code">#${esc(b.external_id)}</span>`:''}</div><div class="bcard-name">${esc(b.name)||'—'}</div>${b.car?`<div class="bcard-meta">🚗 ${esc(b.car)}</div>`:''}</div><div class="bcard-right">${b.pax?`<div class="bcard-pax">${b.pax} 👥</div>`:''}${printed?'<div class="bcard-printed">🖨</div>':''}${b.price?`<div class="bcard-price">${b.price.toFixed(2)}€</div>`:'<div class="bcard-price">0,00€</div>'}</div></div></div>`;
   }).join('');
 }
 
