@@ -101,6 +101,12 @@ function initSchema() {
       shuttle_driver  TEXT,
       shuttle_status  TEXT,
       
+      -- Check-in/out Status
+      checkin_status  TEXT,                         -- 'angerufen_unterwegs' | 'wartet_parkplatz'
+      checkout_status TEXT,                         -- 'gelandet_gepaeck' | 'terminal2_sofort'
+      checkin_by      INTEGER REFERENCES users(id),
+      checkout_by     INTEGER REFERENCES users(id),
+      
       -- Meta
       scraped_date    TEXT,                         -- which day this was scraped for
       created_at      TEXT NOT NULL DEFAULT (datetime('now')),
@@ -249,6 +255,25 @@ function initSchema() {
     d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_unique_v2 ON bookings(external_id, company_id, scraped_date, type)`);
   } catch (e) {
     console.log('[DB] Unique index migration note:', e.message);
+  }
+
+  // Migration: add checkin_status, checkout_status, checkin_by, checkout_by columns
+  const cols = d.prepare("PRAGMA table_info(bookings)").all().map(c => c.name);
+  if (!cols.includes('checkin_status')) {
+    d.exec(`ALTER TABLE bookings ADD COLUMN checkin_status TEXT`);
+    console.log('[DB] Added checkin_status column');
+  }
+  if (!cols.includes('checkout_status')) {
+    d.exec(`ALTER TABLE bookings ADD COLUMN checkout_status TEXT`);
+    console.log('[DB] Added checkout_status column');
+  }
+  if (!cols.includes('checkin_by')) {
+    d.exec(`ALTER TABLE bookings ADD COLUMN checkin_by INTEGER REFERENCES users(id)`);
+    console.log('[DB] Added checkin_by column');
+  }
+  if (!cols.includes('checkout_by')) {
+    d.exec(`ALTER TABLE bookings ADD COLUMN checkout_by INTEGER REFERENCES users(id)`);
+    console.log('[DB] Added checkout_by column');
   }
 
   console.log('[DB] Schema initialized');

@@ -131,6 +131,18 @@
   .bd-check-btn.checkin{background:rgba(255,255,255,.25);color:#fff}
   .bd-check-btn.checkin.done{background:rgba(255,255,255,.4);color:#fff}
   .bd-check-btn.checkout{background:rgba(255,255,255,.25);color:#fff}
+  .bd-checked-info{margin-top:10px;padding:8px;background:rgba(255,255,255,.15);border-radius:6px}
+  .bd-undo-btn{width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.8);font-size:11px;font-weight:600;cursor:pointer;margin-top:6px;transition:all .2s}
+  .bd-undo-btn:hover{background:rgba(255,255,255,.15)}
+  .checkin-options,.checkout-options{display:flex;flex-direction:column;gap:10px}
+  .checkin-option-btn,.checkout-option-btn{display:flex;align-items:center;gap:12px;padding:16px;border-radius:12px;border:2px solid var(--border);background:var(--surface);cursor:pointer;transition:all .15s;text-align:left}
+  .checkin-option-btn:hover,.checkout-option-btn:hover{border-color:var(--accent);background:var(--accent-light)}
+  .checkin-option-btn:active,.checkout-option-btn:active{transform:scale(.98)}
+  .checkout-option-btn.urgent{border-color:var(--red)}
+  .checkout-option-btn.urgent:hover{background:rgba(239,68,68,.1);border-color:var(--red)}
+  .checkin-icon,.checkout-icon{font-size:24px}
+  .checkin-label,.checkout-label{font-size:14px;font-weight:600;color:var(--text)}
+  .bcard-status-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px}
   .bd-flight-row{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 16px 16px;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
   .bd-flight-col{padding:14px;display:flex;align-items:center;gap:8px}
   .bd-flight-col.dep{background:var(--green);color:#fff}

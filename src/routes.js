@@ -214,21 +214,64 @@ router.put('/bookings/:id', requireAuth, (req, res) => {
 router.post('/bookings/:id/checkin', requireAuth, (req, res) => {
   const d = getDb();
   const id = parseInt(req.params.id);
-  const { km } = req.body;
-  d.prepare("UPDATE bookings SET status = 'checked', checked_in_at = datetime('now'), km_in = COALESCE(?, km_in), updated_at = datetime('now') WHERE id = ?")
-    .run(km || null, id);
-  addLog(id, 'checked_in', { km }, req.user.id);
+  const { km, status } = req.body;
+  d.prepare(`UPDATE bookings SET 
+    status = 'checked', 
+    checked_in_at = datetime('now'), 
+    km_in = COALESCE(?, km_in), 
+    checkin_status = ?,
+    checkin_by = ?,
+    updated_at = datetime('now') 
+    WHERE id = ?`)
+    .run(km || null, status || null, req.user.id, id);
+  addLog(id, 'checked_in', { km, status, by: req.user.display_name }, req.user.id);
   res.json({ message: 'Check-in erfolgreich' });
 });
 
 router.post('/bookings/:id/checkout', requireAuth, (req, res) => {
   const d = getDb();
   const id = parseInt(req.params.id);
-  const { km } = req.body;
-  d.prepare("UPDATE bookings SET status = 'checked', checked_out_at = datetime('now'), km_out = COALESCE(?, km_out), updated_at = datetime('now') WHERE id = ?")
-    .run(km || null, id);
-  addLog(id, 'checked_out', { km }, req.user.id);
+  const { km, status } = req.body;
+  d.prepare(`UPDATE bookings SET 
+    status = 'checked', 
+    checked_out_at = datetime('now'), 
+    km_out = COALESCE(?, km_out),
+    checkout_status = ?,
+    checkout_by = ?,
+    updated_at = datetime('now') 
+    WHERE id = ?`)
+    .run(km || null, status || null, req.user.id, id);
+  addLog(id, 'checked_out', { km, status, by: req.user.display_name }, req.user.id);
   res.json({ message: 'Check-out erfolgreich' });
+});
+
+// ─── UNDO CHECK-IN/CHECK-OUT (Admin only) ────────────────────────────────
+router.delete('/bookings/:id/checkin', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  d.prepare(`UPDATE bookings SET 
+    checked_in_at = NULL, 
+    checkin_status = NULL,
+    checkin_by = NULL,
+    status = CASE WHEN checked_out_at IS NULL THEN 'new' ELSE status END,
+    updated_at = datetime('now') 
+    WHERE id = ?`).run(id);
+  addLog(id, 'undo_checkin', { by: req.user.display_name }, req.user.id);
+  res.json({ message: 'Check-in rückgängig gemacht' });
+});
+
+router.delete('/bookings/:id/checkout', requireAuth, requireAdmin, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  d.prepare(`UPDATE bookings SET 
+    checked_out_at = NULL, 
+    checkout_status = NULL,
+    checkout_by = NULL,
+    status = CASE WHEN checked_in_at IS NULL THEN 'new' ELSE status END,
+    updated_at = datetime('now') 
+    WHERE id = ?`).run(id);
+  addLog(id, 'undo_checkout', { by: req.user.display_name }, req.user.id);
+  res.json({ message: 'Check-out rückgängig gemacht' });
 });
 
 router.post('/bookings/:id/pay', requireAuth, (req, res) => {
