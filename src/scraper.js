@@ -321,6 +321,15 @@ async function scrapeYearView(companyId) {
     // We collect into a Map keyed by UID to deduplicate.
     // ──────────────────────────────────────────────────────────────────
 
+    // Debug: log all data-field attributes from the first row
+    const allFields = await page.evaluate(() => {
+      const row = document.querySelector('tr[data-uid]');
+      if (!row) return [];
+      const cells = row.querySelectorAll('td[data-field]');
+      return Array.from(cells).map(c => ({ field: c.getAttribute('data-field'), text: (c.textContent || '').trim().substring(0, 40) }));
+    });
+    console.log(`[YearScraper][${company.name}] Available fields:`, JSON.stringify(allFields));
+
     const extractVisibleRows = async () => {
       return await page.evaluate(() => {
         const rows = document.querySelectorAll('tr[data-uid]');
@@ -355,11 +364,18 @@ async function scrapeYearView(companyId) {
           const code = getField('reservationCode') || '';
           const uid = row.getAttribute('data-uid');
 
+          // Price fields — try various possible field names
+          const priceRaw = getField('totalPrice') || getField('price') || getField('totalAmount') 
+            || getField('amount') || getField('outstandingAmount') || getField('revenue')
+            || getField('invoiceAmount') || getField('calculatedPrice') || getField('total')
+            || getField('value') || getField('Wert') || '';
+
           if (uid && (kennzeichen || cleanName)) {
             results.push({
               name: cleanName, kennzeichen, parkdatum, rueckgabe,
               zeit, rueckgabeZeit,
               personen, tage, flug, flugRueck, telefon, fahrzeug, code, uid,
+              priceRaw,
               type: 'checkin'
             });
           }
@@ -508,6 +524,10 @@ async function scrapeYearView(companyId) {
     const rawBookings = Array.from(allCollected.values());
     console.log(`[YearScraper][${company.name}] Total collected: ${rawBookings.length}`);
 
+    // Log first 3 bookings' price values for debugging
+    const priceSamples = rawBookings.slice(0, 3).map(b => ({ code: b.code, priceRaw: b.priceRaw }));
+    console.log(`[YearScraper][${company.name}] Price samples:`, JSON.stringify(priceSamples));
+
     // Helper: parse date string like "01.03.2026" or "2026-03-01" to "YYYY-MM-DD"
     function parseDate(str) {
       if (!str) return null;
@@ -522,13 +542,20 @@ async function scrapeYearView(companyId) {
       return null;
     }
 
+    // Helper: parse price string like "120,99 €" or "0,00€" to float
+    function parsePrice(str) {
+      if (!str) return null;
+      const cleaned = str.replace(/[€\s]/g, '').replace(',', '.');
+      const val = parseFloat(cleaned);
+      return isNaN(val) ? null : val;
+    }
+
     // Upsert into database — create TWO entries per booking:
-    //   1. type='in' (Annahme) on the parkdatum (arrival date)
-    //   2. type='out' (Rückgabe) on the rueckgabedatum (departure date)
     let created = 0, updated = 0;
     for (const b of rawBookings) {
       const arrivalDate = parseDate(b.parkdatum);
       const departureDate = parseDate(b.rueckgabe);
+      const price = parsePrice(b.priceRaw);
 
       // 1) Annahme entry on arrival date
       if (arrivalDate) {
@@ -537,6 +564,7 @@ async function scrapeYearView(companyId) {
           rueckgabeDatum: departureDate || b.rueckgabe,
           rueckgabeZeit: b.rueckgabeZeit || null,
           type: 'checkin',
+          price,
         };
         const r1 = upsertBookingFromScrape(inData, companyId, arrivalDate);
         if (r1.action === 'created') created++; else updated++;
@@ -546,11 +574,11 @@ async function scrapeYearView(companyId) {
       if (departureDate && departureDate !== arrivalDate) {
         const outData = {
           ...b,
-          // For the checkout row, swap the time: zeit = rueckgabeZeit
           zeit: b.rueckgabeZeit || null,
           rueckgabeDatum: departureDate,
           rueckgabeZeit: b.rueckgabeZeit || null,
           type: 'checkout',
+          price,
         };
         const r2 = upsertBookingFromScrape(outData, companyId, departureDate);
         if (r2.action === 'created') created++; else updated++;

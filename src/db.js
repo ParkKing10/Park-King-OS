@@ -350,6 +350,7 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
         flight_code = COALESCE(?, flight_code),
         pax = COALESCE(?, pax),
         days = COALESCE(?, days),
+        price = COALESCE(?, price),
         provider = COALESCE(?, provider),
         type = COALESCE(?, type),
         updated_at = datetime('now')
@@ -360,7 +361,9 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
       booking.type === 'checkout' ? booking.zeit : booking.rueckgabeZeit,
       booking.parkdatum, booking.rueckgabeDatum,
       booking.flug, booking.personen ? parseInt(booking.personen) : null,
-      booking.tage ? parseInt(booking.tage) : null, null,
+      booking.tage ? parseInt(booking.tage) : null,
+      booking.price || null,
+      null,
       booking.type === 'checkin' ? 'in' : booking.type === 'checkout' ? 'out' : null,
       existing.id
     );
@@ -374,8 +377,8 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
       external_id, uid, company_id, type, status,
       name, phone, pax, plate, car,
       date_in, time_in, date_out, time_out,
-      flight_code, days, provider, scraped_date
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      flight_code, days, price, provider, scraped_date
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     booking.code || booking.uid, booking.uid, companyId,
     isCheckout ? 'out' : 'in',
@@ -386,6 +389,7 @@ function upsertBookingFromScrape(booking, companyId, scrapedDate) {
     booking.parkdatum, isCheckout ? null : booking.zeit,
     booking.rueckgabeDatum || booking.rueckgabe, isCheckout ? booking.zeit : booking.rueckgabeZeit,
     booking.flug, booking.tage ? parseInt(booking.tage) : null,
+    booking.price || null,
     'Park King', scrapedDate
   );
 
