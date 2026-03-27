@@ -200,9 +200,23 @@ function initSchema() {
       end_time    TEXT NOT NULL,                    -- '12:00'
       break_min   INTEGER NOT NULL DEFAULT 0,      -- break in minutes
       note        TEXT,
+      actual_start TEXT,                           -- tatsächliche Startzeit (HH:MM)
+      actual_end   TEXT,                           -- tatsächliche Endzeit (HH:MM)
+      was_late     INTEGER DEFAULT 0,              -- 1 wenn verspätet
+      late_minutes INTEGER DEFAULT 0,              -- Minuten Verspätung
       created_by  INTEGER REFERENCES users(id),
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ═══ SHIFT LOG (Verspätungen etc.) ═══
+    CREATE TABLE IF NOT EXISTS shift_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      shift_id    INTEGER NOT NULL REFERENCES shifts(id),
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      action      TEXT NOT NULL,                   -- 'checkin', 'checkout', 'late_checkin'
+      details     TEXT,                            -- JSON
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     -- ═══ DAMAGES (Schadensprotokoll) ═══
@@ -275,6 +289,35 @@ function initSchema() {
     d.exec(`ALTER TABLE bookings ADD COLUMN checkout_by INTEGER REFERENCES users(id)`);
     console.log('[DB] Added checkout_by column');
   }
+
+  // Migration: add shift check-in columns
+  const shiftCols = d.prepare("PRAGMA table_info(shifts)").all().map(c => c.name);
+  if (!shiftCols.includes('actual_start')) {
+    d.exec(`ALTER TABLE shifts ADD COLUMN actual_start TEXT`);
+    console.log('[DB] Added shifts.actual_start column');
+  }
+  if (!shiftCols.includes('actual_end')) {
+    d.exec(`ALTER TABLE shifts ADD COLUMN actual_end TEXT`);
+    console.log('[DB] Added shifts.actual_end column');
+  }
+  if (!shiftCols.includes('was_late')) {
+    d.exec(`ALTER TABLE shifts ADD COLUMN was_late INTEGER DEFAULT 0`);
+    console.log('[DB] Added shifts.was_late column');
+  }
+  if (!shiftCols.includes('late_minutes')) {
+    d.exec(`ALTER TABLE shifts ADD COLUMN late_minutes INTEGER DEFAULT 0`);
+    console.log('[DB] Added shifts.late_minutes column');
+  }
+
+  // Create shift_log table if not exists
+  d.exec(`CREATE TABLE IF NOT EXISTS shift_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shift_id INTEGER NOT NULL REFERENCES shifts(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    action TEXT NOT NULL,
+    details TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
 
   console.log('[DB] Schema initialized');
 }

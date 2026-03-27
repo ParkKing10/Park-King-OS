@@ -731,6 +731,100 @@ router.delete('/shifts/:id', requireAuth, requireAdmin, (req, res) => {
   res.json({ message: 'Schicht gelöscht' });
 });
 
+// ─── SHIFT CHECK-IN ──────────────────────────────────────────────────────
+router.post('/shifts/:id/checkin', requireAuth, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  const { is_late } = req.body;
+  
+  // Prüfe ob Schicht dem User gehört
+  const shift = d.prepare('SELECT * FROM shifts WHERE id = ?').get(id);
+  if (!shift) return res.status(404).json({ error: 'Schicht nicht gefunden' });
+  if (shift.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'Das ist nicht deine Schicht' });
+  }
+  if (shift.actual_start) {
+    return res.status(400).json({ error: 'Bereits eingecheckt' });
+  }
+  
+  const now = new Date();
+  const actualTime = now.toTimeString().slice(0, 5);
+  
+  // Berechne Verspätung
+  const [startH, startM] = shift.start_time.split(':').map(Number);
+  const scheduledMinutes = startH * 60 + startM;
+  const actualMinutes = now.getHours() * 60 + now.getMinutes();
+  const lateMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+  const wasLate = lateMinutes > 0 ? 1 : 0;
+  
+  // Wenn verspätet, aktualisiere auch die geplante Startzeit
+  const newStartTime = wasLate ? actualTime : shift.start_time;
+  
+  d.prepare(`
+    UPDATE shifts SET 
+      actual_start = ?,
+      start_time = ?,
+      was_late = ?,
+      late_minutes = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(actualTime, newStartTime, wasLate, lateMinutes, id);
+  
+  // Log eintragen
+  const action = wasLate ? 'late_checkin' : 'checkin';
+  d.prepare(`
+    INSERT INTO shift_log (shift_id, user_id, action, details)
+    VALUES (?, ?, ?, ?)
+  `).run(id, req.user.id, action, JSON.stringify({ 
+    actual_time: actualTime, 
+    scheduled_time: shift.start_time,
+    late_minutes: lateMinutes 
+  }));
+  
+  res.json({ 
+    message: wasLate ? `Verspätet eingecheckt (${lateMinutes} Min.)` : 'Eingecheckt',
+    actual_start: actualTime,
+    was_late: wasLate,
+    late_minutes: lateMinutes
+  });
+});
+
+// ─── SHIFT CHECK-OUT ─────────────────────────────────────────────────────
+router.post('/shifts/:id/checkout', requireAuth, (req, res) => {
+  const d = getDb();
+  const id = parseInt(req.params.id);
+  
+  // Prüfe ob Schicht dem User gehört
+  const shift = d.prepare('SELECT * FROM shifts WHERE id = ?').get(id);
+  if (!shift) return res.status(404).json({ error: 'Schicht nicht gefunden' });
+  if (shift.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'Das ist nicht deine Schicht' });
+  }
+  if (!shift.actual_start) {
+    return res.status(400).json({ error: 'Noch nicht eingecheckt' });
+  }
+  if (shift.actual_end) {
+    return res.status(400).json({ error: 'Bereits ausgecheckt' });
+  }
+  
+  const actualTime = new Date().toTimeString().slice(0, 5);
+  
+  d.prepare(`
+    UPDATE shifts SET 
+      actual_end = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(actualTime, id);
+  
+  // Log eintragen
+  d.prepare(`
+    INSERT INTO shift_log (shift_id, user_id, action, details)
+    VALUES (?, ?, 'checkout', ?)
+  `).run(id, req.user.id, JSON.stringify({ actual_time: actualTime }));
+  
+  res.json({ message: 'Ausgecheckt', actual_end: actualTime });
+});
+
 // Monthly hours summary
 router.get('/shifts/hours', requireAuth, (req, res) => {
   const d = getDb();

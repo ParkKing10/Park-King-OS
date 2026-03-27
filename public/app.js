@@ -454,35 +454,28 @@ function openBookingDetail(idx) {
       </div>
     </div>
 
-    <!-- STATUS SECTION -->
+    <!-- STATUS SECTION - nur 1 Status aktiv -->
     <div class="bd-status-section">
       <div class="bd-status-header">📍 Kunden-Status</div>
-      <div class="bd-status-grid">
-        <div class="bd-status-col">
-          <div class="bd-status-label">Check-in Status</div>
+      ${(b.checkin_status || b.checkout_status) ? `
+        <!-- Ein Status ist aktiv - zeige ihn mit Löschen-Button -->
+        <div class="bd-status-active-row">
           ${b.checkin_status ? `
             <div class="bd-status-active ${b.checkin_status}">${checkinStatusLabels[b.checkin_status] || b.checkin_status}</div>
-            ${isAdmin ? `<button class="bd-status-clear" onclick="clearCheckinStatus(${idx})">✕ Löschen</button>` : ''}
           ` : `
-            <div class="bd-status-btns">
-              <button class="bd-status-btn" onclick="setCheckinStatus(${idx}, 'angerufen_unterwegs')">📞 Unterwegs</button>
-              <button class="bd-status-btn" onclick="setCheckinStatus(${idx}, 'wartet_parkplatz')">🅿️ Wartet</button>
-            </div>
-          `}
-        </div>
-        <div class="bd-status-col">
-          <div class="bd-status-label">Check-out Status</div>
-          ${b.checkout_status ? `
             <div class="bd-status-active ${b.checkout_status}">${checkoutStatusLabels[b.checkout_status] || b.checkout_status}</div>
-            ${isAdmin ? `<button class="bd-status-clear" onclick="clearCheckoutStatus(${idx})">✕ Löschen</button>` : ''}
-          ` : `
-            <div class="bd-status-btns">
-              <button class="bd-status-btn" onclick="setCheckoutStatus(${idx}, 'gelandet_gepaeck')">✈️ Gelandet</button>
-              <button class="bd-status-btn urgent" onclick="setCheckoutStatus(${idx}, 'terminal2_sofort')">🚨 T2 Sofort!</button>
-            </div>
           `}
+          <button class="bd-status-clear-btn" onclick="${b.checkin_status ? `clearCheckinStatus(${idx})` : `clearCheckoutStatus(${idx})`}">✕ Entfernen</button>
         </div>
-      </div>
+      ` : `
+        <!-- Kein Status aktiv - zeige alle 4 Optionen -->
+        <div class="bd-status-all-btns">
+          <button class="bd-status-btn" onclick="setCheckinStatus(${idx}, 'angerufen_unterwegs')">📞 Hat angerufen & auf m Weg</button>
+          <button class="bd-status-btn" onclick="setCheckinStatus(${idx}, 'wartet_parkplatz')">🅿️ Wartet auf dem Parkplatz</button>
+          <button class="bd-status-btn" onclick="setCheckoutStatus(${idx}, 'gelandet_gepaeck')">✈️ Gelandet & wartet auf Gepäck</button>
+          <button class="bd-status-btn urgent" onclick="setCheckoutStatus(${idx}, 'terminal2_sofort')">🚨 Terminal 2 - Sofort abholen!</button>
+        </div>
+      `}
     </div>
 
     <div class="bd-flight-row">
@@ -629,12 +622,15 @@ async function doCheckout(idx) {
 }
 
 // ─── Status setzen (separat von Check-in/out) ──────────────────────────
+// Nur 1 Status kann aktiv sein - beim Setzen wird der andere gelöscht
 async function setCheckinStatus(idx, status) {
   const b = allBookings[idx];
   if (!b || !b.id) return;
   try {
-    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkin_status: status }) });
+    // Setze checkin_status UND lösche checkout_status
+    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkin_status: status, checkout_status: null }) });
     b.checkin_status = status;
+    b.checkout_status = null;
     showToast('Status gesetzt ✓');
     openBookingDetail(idx);
     filterBookings();
@@ -645,8 +641,10 @@ async function setCheckoutStatus(idx, status) {
   const b = allBookings[idx];
   if (!b || !b.id) return;
   try {
-    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkout_status: status }) });
+    // Setze checkout_status UND lösche checkin_status
+    await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkout_status: status, checkin_status: null }) });
     b.checkout_status = status;
+    b.checkin_status = null;
     showToast('Status gesetzt ✓');
     openBookingDetail(idx);
     filterBookings();
@@ -659,7 +657,7 @@ async function clearCheckinStatus(idx) {
   try {
     await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkin_status: null }) });
     b.checkin_status = null;
-    showToast('Status gelöscht ✓');
+    showToast('Status entfernt ✓');
     openBookingDetail(idx);
     filterBookings();
   } catch (e) { showToast('Fehler ⚠️'); }
@@ -671,7 +669,7 @@ async function clearCheckoutStatus(idx) {
   try {
     await fetch('/api/bookings/' + b.id + '/status', { method: 'PUT', headers: ah(), body: JSON.stringify({ checkout_status: null }) });
     b.checkout_status = null;
-    showToast('Status gelöscht ✓');
+    showToast('Status entfernt ✓');
     openBookingDetail(idx);
     filterBookings();
   } catch (e) { showToast('Fehler ⚠️'); }
@@ -926,17 +924,178 @@ async function loadSchedule(){
 function renderSchedule(days, data) {
   const today=new Date().toISOString().split('T')[0];const isAdmin=currentUser&&currentUser.role==='admin';
   const grid=document.getElementById('scheduleGrid');
+  
+  // Finde meine Schicht heute
+  const myShiftToday = (data.shifts||[]).find(s => s.date === today && s.user_id === currentUser?.id);
+  renderMyShiftToday(myShiftToday);
+  
   grid.innerHTML=days.map((day,di)=>{
     const dateStr=day.toISOString().split('T')[0];const isToday=dateStr===today;
     const dayShifts=(data.shifts||[]).filter(s=>s.date===dateStr);
     return`<div class="day-row"><div class="day-header ${isToday?'today':''}"><span class="day-name">${DAY_NAMES[di]}</span><span class="day-date">${day.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span></div><div class="day-shifts">${dayShifts.length?dayShifts.map(s=>{
       const color=s.template_color||'#CC6CE7';const hrs=calcHours(s.start_time,s.end_time,s.break_min);
-      return`<div class="shift-pill" style="background:${color}20;color:${color};border-left:3px solid ${color}"><span class="shift-time">${s.start_time}–${s.end_time}</span><span class="shift-user">${esc(s.user_name)}</span><span class="shift-hours">${hrs.toFixed(1)}h</span>${isAdmin?`<button class="shift-del" onclick="event.stopPropagation();deleteShift(${s.id})">✕</button>`:''}</div>`;
+      const checkedIn = s.actual_start ? `<span style="font-size:10px;opacity:0.7"> ✓${s.actual_start}</span>` : '';
+      const checkedOut = s.actual_end ? `<span style="font-size:10px;opacity:0.7"> →${s.actual_end}</span>` : '';
+      const lateTag = s.was_late ? `<span style="font-size:9px;background:#dc2626;color:#fff;padding:1px 4px;border-radius:3px;margin-left:4px">⚠️ Verspätet</span>` : '';
+      return`<div class="shift-pill" style="background:${color}20;color:${color};border-left:3px solid ${color}"><span class="shift-time">${s.start_time}–${s.end_time}${checkedIn}${checkedOut}</span><span class="shift-user">${esc(s.user_name)}${lateTag}</span><span class="shift-hours">${hrs.toFixed(1)}h</span>${isAdmin?`<button class="shift-del" onclick="event.stopPropagation();deleteShift(${s.id})">✕</button>`:''}</div>`;
     }).join(''):'<div class="day-empty">Keine Schichten</div>'}${isAdmin?`<button class="day-add" onclick="openModal('addShift',{date:'${dateStr}',dayName:'${DAY_NAMES[di]} ${day.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}'})">+ Schicht</button>`:''}</div></div>`;
   }).join('');
   if(data.hoursByUser&&Object.keys(data.hoursByUser).length){
     document.getElementById('hoursSummary').style.display='block';
     document.getElementById('hoursRows').innerHTML=Object.values(data.hoursByUser).sort((a,b)=>b.hours-a.hours).map(u=>`<div class="hours-row"><span class="hours-user">${esc(u.name)} <span style="font-size:11px;color:var(--text3);font-weight:400">(${u.shifts} Schichten)</span></span><span class="hours-val">${u.hours.toFixed(1)} Std</span></div>`).join('');
+  }
+}
+
+// ─── Meine Schicht Heute Rendern ──────────────────────────────────────────
+function renderMyShiftToday(shift) {
+  const box = document.getElementById('myShiftToday');
+  if (!shift) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = 'block';
+  const info = document.getElementById('myShiftInfo');
+  const actions = document.getElementById('myShiftActions');
+  
+  const now = new Date();
+  const nowTime = now.toTimeString().slice(0, 5);
+  const [startH, startM] = shift.start_time.split(':').map(Number);
+  const scheduledStart = new Date(now); scheduledStart.setHours(startH, startM, 0, 0);
+  const isLate = now > scheduledStart && !shift.actual_start;
+  const minutesLate = Math.floor((now - scheduledStart) / 60000);
+  
+  info.innerHTML = `
+    <div class="my-shift-time">${shift.start_time} – ${shift.end_time}</div>
+    <div class="my-shift-status">
+      ${shift.actual_start ? `✅ Eingecheckt: ${shift.actual_start}` : ''}
+      ${shift.actual_end ? ` · Ausgecheckt: ${shift.actual_end}` : ''}
+      ${shift.was_late ? ` · ⚠️ Verspätet` : ''}
+    </div>
+  `;
+  
+  if (shift.actual_start && shift.actual_end) {
+    // Schicht beendet
+    actions.innerHTML = `<div class="shift-checked-in">✅ Schicht beendet</div>`;
+  } else if (shift.actual_start) {
+    // Eingecheckt, noch nicht ausgecheckt
+    actions.innerHTML = `<button class="shift-checkin-btn end" onclick="shiftCheckout(${shift.id})">🏁 Schicht beenden</button>`;
+  } else {
+    // Noch nicht eingecheckt
+    let warningHtml = '';
+    if (isLate) {
+      warningHtml = `
+        <div class="shift-late-warning">
+          <div class="warning-title">⚠️ Du bist ${minutesLate} Minuten zu spät!</div>
+          <div>Pünktlichkeit ist wichtig. Deine Startzeit wird auf ${nowTime} korrigiert.</div>
+          <div class="warning-quote">„Bester Beweis einer guten Erziehung ist die Pünktlichkeit."</div>
+        </div>
+      `;
+    }
+    actions.innerHTML = `
+      ${warningHtml}
+      <button class="shift-checkin-btn start" onclick="shiftCheckin(${shift.id}, ${isLate})">▶️ Schicht starten</button>
+    `;
+  }
+}
+
+// ─── GPS Standort Check ────────────────────────────────────────────────────
+const WORK_LOCATION = { lat: 53.6847, lng: 9.8908 }; // Klövesteen 21, 25474 Hasloh
+const MAX_DISTANCE_METERS = 200; // 200m Toleranz
+
+function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Erdradius in Metern
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+async function checkLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('GPS nicht verfügbar'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const dist = getDistanceFromLatLonInMeters(
+          pos.coords.latitude, pos.coords.longitude,
+          WORK_LOCATION.lat, WORK_LOCATION.lng
+        );
+        if (dist <= MAX_DISTANCE_METERS) {
+          resolve({ ok: true, distance: dist });
+        } else {
+          resolve({ ok: false, distance: dist });
+        }
+      },
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+}
+
+// ─── Schicht Check-in/out ─────────────────────────────────────────────────
+async function shiftCheckin(shiftId, isLate) {
+  try {
+    // GPS Check
+    showToast('📍 Standort wird geprüft...');
+    const loc = await checkLocation();
+    if (!loc.ok) {
+      alert(`❌ Du bist nicht am Arbeitsort!\n\nDu bist ${Math.round(loc.distance)}m entfernt.\nCheck-in nur möglich bei: Klövesteen 21, 25474 Hasloh`);
+      return;
+    }
+    
+    const r = await fetch('/api/shifts/' + shiftId + '/checkin', { 
+      method: 'POST', 
+      headers: ah(), 
+      body: JSON.stringify({ is_late: isLate }) 
+    });
+    const data = await r.json();
+    if (data.error) {
+      showToast(data.error + ' ⚠️');
+      return;
+    }
+    showToast('✅ Schicht gestartet');
+    loadSchedule();
+  } catch (e) {
+    if (e.message.includes('GPS') || e.code === 1) {
+      alert('❌ GPS-Zugriff verweigert!\n\nBitte erlaube den Standortzugriff um einzuchecken.');
+    } else {
+      showToast('Fehler: ' + e.message + ' ⚠️');
+    }
+  }
+}
+
+async function shiftCheckout(shiftId) {
+  try {
+    // GPS Check
+    showToast('📍 Standort wird geprüft...');
+    const loc = await checkLocation();
+    if (!loc.ok) {
+      alert(`❌ Du bist nicht am Arbeitsort!\n\nDu bist ${Math.round(loc.distance)}m entfernt.\nCheck-out nur möglich bei: Klövesteen 21, 25474 Hasloh`);
+      return;
+    }
+    
+    const r = await fetch('/api/shifts/' + shiftId + '/checkout', { 
+      method: 'POST', 
+      headers: ah() 
+    });
+    const data = await r.json();
+    if (data.error) {
+      showToast(data.error + ' ⚠️');
+      return;
+    }
+    showToast('✅ Schicht beendet');
+    loadSchedule();
+  } catch (e) {
+    if (e.message.includes('GPS') || e.code === 1) {
+      alert('❌ GPS-Zugriff verweigert!\n\nBitte erlaube den Standortzugriff um auszuchecken.');
+    } else {
+      showToast('Fehler: ' + e.message + ' ⚠️');
+    }
   }
 }
 
