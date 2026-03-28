@@ -1,38 +1,107 @@
-FROM node:20-slim
+// ═══════════════════════════════════════════════════════════════════════════
+//  Park King OS — Authentication (JWT + bcrypt)
+// ═══════════════════════════════════════════════════════════════════════════
 
-# Install Chrome + build tools for better-sqlite3
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdrm2 \
-    libgbm1 \
-    libnss3 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    xdg-utils \
-    python3 \
-    make \
-    g++ \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { getDb } = require('./db');
 
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+const JWT_SECRET = process.env.JWT_SECRET || 'parkking-os-secret-change-me';
+const TOKEN_EXPIRY = '30d'; // 30 Tage eingeloggt bleiben
 
-WORKDIR /app
+// ─── Generate token ─────────────────────────────────────────────────────
 
-COPY package*.json ./
-RUN npm install --production
+function generateToken(user) {
+  return jwt.sign(
+    { id: user.id, username: user.username, role: user.role, name: user.display_name },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRY }
+  );
+}
 
-COPY . .
+// ─── Verify token ───────────────────────────────────────────────────────
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
 
-EXPOSE 3000
+// ─── Login ──────────────────────────────────────────────────────────────
 
-CMD ["node", "src/server.js"]
+function login(username, password) {
+  const d = getDb();
+  const user = d.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+  if (!user) return null;
+  if (!bcrypt.compareSync(password, user.password)) return null;
+  const token = generateToken(user);
+  return {
+    token,
+    user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name }
+  };
+}
+
+// ─── Middleware: require auth ────────────────────────────────────────────
+
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token fehlt' });
+  }
+  const token = authHeader.substring(7);
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(401).json({ error: 'Token ungültig oder abgelaufen' });
+  }
+  req.user = decoded;
+  next();
+}
+
+// ─── Middleware: require admin ───────────────────────────────────────────
+
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin-Rechte erforderlich' });
+  }
+  next();
+}
+
+// ─── User management ────────────────────────────────────────────────────
+
+function createUser(username, password, displayName, role) {
+  const d = getDb();
+  const hash = bcrypt.hashSync(password, 10);
+  const result = d.prepare('INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)')
+    .run(username, hash, displayName, role || 'staff');
+  return result.lastInsertRowid;
+}
+
+function updateUser(id, updates) {
+  const d = getDb();
+  const fields = [];
+  const values = [];
+
+  if (updates.display_name) { fields.push('display_name = ?'); values.push(updates.display_name); }
+  if (updates.role) { fields.push('role = ?'); values.push(updates.role); }
+  if (updates.active !== undefined) { fields.push('active = ?'); values.push(updates.active ? 1 : 0); }
+  if (updates.password) {
+    fields.push('password = ?');
+    values.push(bcrypt.hashSync(updates.password, 10));
+  }
+
+  if (!fields.length) return false;
+  fields.push("updated_at = datetime('now')");
+  values.push(id);
+
+  d.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  return true;
+}
+
+function listUsers() {
+  const d = getDb();
+  return d.prepare('SELECT id, username, display_name, role, active, created_at FROM users ORDER BY role DESC, display_name').all();
+}
+
+module.exports = { login, generateToken, verifyToken, requireAuth, requireAdmin, createUser, updateUser, listUsers };
