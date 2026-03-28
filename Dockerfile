@@ -1,1075 +1,639 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  Park King OS — API Routes
+//  Park King OS — ParkingPro Scraper
+//  Reused and cleaned up from the Label Print Tool scraper
 // ═══════════════════════════════════════════════════════════════════════════
 
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
+const puppeteer = require('puppeteer');
+const { getDb, upsertBookingFromScrape, addLog } = require('./db');
 const fs = require('fs');
-const { getDb, addLog } = require('./db');
-const { login, requireAuth, requireAdmin, createUser, updateUser, listUsers } = require('./auth');
-const { scrapeCompany, scrapeYearView, autoScrapeAll } = require('./scraper');
+const { execSync } = require('child_process');
 
-const router = express.Router();
+let browserInstance = null;
 
-// ─── Photo upload config ────────────────────────────────────────────────
-const UPLOAD_DIR = path.join(__dirname, '..', 'data', 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// ─── Find Chrome ────────────────────────────────────────────────────────
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `dmg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+async function findChromePath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) cb(null, true);
-  else cb(new Error('Nur Bilder erlaubt'));
-}});
-
-// ─── AUTH ────────────────────────────────────────────────────────────────
-
-router.post('/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Username und Passwort erforderlich' });
-  const result = login(username, password);
-  if (!result) return res.status(401).json({ error: 'Ungültige Zugangsdaten' });
-  res.json(result);
-});
-
-router.get('/auth/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
-});
-
-// ─── USERS (admin only) ─────────────────────────────────────────────────
-
-router.get('/users', requireAuth, requireAdmin, (req, res) => {
-  res.json(listUsers());
-});
-
-router.post('/users', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { username, password, display_name, role } = req.body;
-    if (!username || !password || !display_name) {
-      return res.status(400).json({ error: 'Username, Passwort und Name erforderlich' });
-    }
-    const id = createUser(username, password, display_name, role || 'staff');
-    res.json({ id, message: 'Benutzer erstellt' });
-  } catch (err) {
-    if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'Username bereits vergeben' });
-    res.status(500).json({ error: err.message });
+    const result = execSync('find /opt/render -name "chrome" -type f 2>/dev/null || find /home -name "chrome" -type f 2>/dev/null || true', { encoding: 'utf8' });
+    const paths = result.trim().split('\n').filter(p => p && !p.includes('crashpad'));
+    if (paths.length > 0) return paths[0];
+  } catch { /* ignore */ }
+
+  const systemPaths = ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'];
+  for (const p of systemPaths) {
+    if (fs.existsSync(p)) return p;
   }
-});
-
-router.put('/users/:id', requireAuth, requireAdmin, (req, res) => {
-  const success = updateUser(parseInt(req.params.id), req.body);
-  if (success) res.json({ message: 'Benutzer aktualisiert' });
-  else res.status(400).json({ error: 'Keine Änderungen' });
-});
-
-router.delete('/users/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  if (id === req.user.id) return res.status(400).json({ error: 'Du kannst dich nicht selbst löschen' });
-  d.prepare('UPDATE users SET active = 0 WHERE id = ?').run(id);
-  res.json({ message: 'Benutzer deaktiviert' });
-});
-
-// ─── COMPANIES ──────────────────────────────────────────────────────────
-
-router.get('/companies', requireAuth, (req, res) => {
-  const d = getDb();
-  const companies = d.prepare('SELECT id, name, active FROM companies').all();
-  res.json(companies);
-});
-
-router.put('/companies/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { name, base_url, email, password, active } = req.body;
-  d.prepare(`
-    UPDATE companies SET
-      name = COALESCE(?, name),
-      base_url = COALESCE(?, base_url),
-      email = COALESCE(?, email),
-      password = COALESCE(?, password),
-      active = COALESCE(?, active)
-    WHERE id = ?
-  `).run(name, base_url, email, password, active !== undefined ? (active ? 1 : 0) : null, req.params.id);
-  res.json({ message: 'Firma aktualisiert' });
-});
-
-// ─── BOOKINGS ───────────────────────────────────────────────────────────
-
-router.get('/bookings', requireAuth, (req, res) => {
-  const d = getDb();
-  const { company, date, type, status, search, limit, offset } = req.query;
-
-  let sql = 'SELECT * FROM bookings WHERE 1=1';
-  const params = [];
-
-  if (company) { sql += ' AND company_id = ?'; params.push(company); }
-  if (date) { sql += ' AND scraped_date = ?'; params.push(date); }
-  else { sql += ' AND scraped_date = ?'; params.push(new Date().toISOString().split('T')[0]); }
-  if (type) { sql += ' AND type = ?'; params.push(type); }
-  if (status) { sql += ' AND status = ?'; params.push(status); }
-  if (search) {
-    sql += ' AND (plate LIKE ? OR name LIKE ? OR phone LIKE ? OR external_id LIKE ?)';
-    const s = `%${search}%`;
-    params.push(s, s, s, s);
-  }
-
-  sql += " ORDER BY COALESCE(time_in, time_out, '99:99') ASC";
-
-  if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
-  if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
-
-  const bookings = d.prepare(sql).all(...params);
-
-  // Stats
-  const statsDate = date || new Date().toISOString().split('T')[0];
-  const stats = d.prepare(`
-    SELECT
-      COUNT(*) as total,
-      SUM(CASE WHEN type = 'in' THEN 1 ELSE 0 END) as annahmen,
-      SUM(CASE WHEN type = 'out' THEN 1 ELSE 0 END) as rueckgaben,
-      SUM(CASE WHEN status IN ('new', 'pending') THEN 1 ELSE 0 END) as offen,
-      SUM(COALESCE(price, 0)) as total_due,
-      SUM(CASE WHEN paid = 1 THEN COALESCE(price, 0) ELSE 0 END) as total_paid
-    FROM bookings WHERE scraped_date = ? ${company ? 'AND company_id = ?' : ''}
-  `).get(...(company ? [statsDate, company] : [statsDate]));
-
-  res.json({ bookings, stats, date: statsDate });
-});
-
-// ─── BOOKING SEARCH (across all dates) ─────────────────────────────────
-
-router.get('/bookings/search', requireAuth, (req, res) => {
-  const d = getDb();
-  const { q, company, date_from, date_to, limit } = req.query;
-
-  if (!q && !date_from && !date_to) {
-    return res.status(400).json({ error: 'Suchbegriff oder Datumsbereich erforderlich' });
-  }
-
-  let sql = 'SELECT * FROM bookings WHERE 1=1';
-  const params = [];
-
-  if (company) { sql += ' AND company_id = ?'; params.push(company); }
-  if (date_from) { sql += ' AND scraped_date >= ?'; params.push(date_from); }
-  if (date_to) { sql += ' AND scraped_date <= ?'; params.push(date_to); }
-  if (q) {
-    // Suche ohne Leerzeichen/Bindestriche für Kennzeichen
-    const qNorm = q.replace(/[\s-]/g, '').toUpperCase();
-    sql += ` AND (
-      UPPER(REPLACE(REPLACE(plate, ' ', ''), '-', '')) LIKE ? 
-      OR UPPER(name) LIKE ? 
-      OR phone LIKE ? 
-      OR external_id LIKE ? 
-      OR UPPER(flight_code) LIKE ? 
-      OR UPPER(car) LIKE ?
-    )`;
-    const s = `%${q.toUpperCase()}%`;
-    const sNorm = `%${qNorm}%`;
-    params.push(sNorm, s, `%${q}%`, `%${q}%`, s, s);
-  }
-
-  sql += ' ORDER BY scraped_date DESC, COALESCE(time_in, time_out, \'99:99\') ASC';
-  sql += ' LIMIT ?';
-  params.push(parseInt(limit) || 100);
-
-  const bookings = d.prepare(sql).all(...params);
-  res.json({ bookings, total: bookings.length });
-});
-
-router.get('/bookings/:id', requireAuth, (req, res) => {
-  const d = getDb();
-  const booking = d.prepare('SELECT * FROM bookings WHERE id = ?').get(parseInt(req.params.id));
-  if (!booking) return res.status(404).json({ error: 'Buchung nicht gefunden' });
-
-  const log = d.prepare('SELECT l.*, u.display_name as user_name FROM booking_log l LEFT JOIN users u ON l.user_id = u.id WHERE l.booking_id = ? ORDER BY l.created_at DESC').all(booking.id);
-  res.json({ booking, log });
-});
-
-// ─── BOOKING LOG (separate endpoint) ─────────────────────────────────────
-router.get('/bookings/:id/log', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const logs = d.prepare(`
-    SELECT l.*, u.display_name 
-    FROM booking_log l 
-    LEFT JOIN users u ON l.user_id = u.id 
-    WHERE l.booking_id = ? 
-    ORDER BY l.created_at DESC
-    LIMIT 50
-  `).all(id);
-  res.json(logs);
-});
-
-// ─── LOG ACTION (for frontend actions like label print) ──────────────────
-router.post('/bookings/:id/log-action', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id);
-  const { action, details } = req.body;
-  if (!action) return res.status(400).json({ error: 'Action erforderlich' });
-  addLog(id, action, details || null, req.user.id);
-  res.json({ message: 'Logged' });
-});
-
-router.put('/bookings/:id', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const b = req.body;
-
-  const fields = [];
-  const values = [];
-  const allowed = ['name', 'phone', 'email', 'pax', 'plate', 'car', 'key_code',
-    'key_handed_in', 'km_in', 'km_out', 'date_in', 'time_in', 'date_out', 'time_out',
-    'flight_code', 'flight_sched', 'flight_live', 'provider', 'days', 'price',
-    'wash', 'wash_done', 'comment', 'phone_contacted', 'shuttle_driver', 'shuttle_status', 'type', 'status',
-    'checkin_status', 'checkout_status'];
-
-  for (const key of allowed) {
-    if (b[key] !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(b[key]);
-    }
-  }
-
-  if (!fields.length) return res.status(400).json({ error: 'Keine Änderungen' });
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-
-  d.prepare(`UPDATE bookings SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  addLog(id, 'edited', b, req.user.id);
-  res.json({ message: 'Buchung aktualisiert' });
-});
-
-// ─── BOOKING ACTIONS ────────────────────────────────────────────────────
-
-router.post('/bookings/:id/checkin', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const { km, status } = req.body;
-  d.prepare(`UPDATE bookings SET 
-    status = 'checked', 
-    checked_in_at = datetime('now'), 
-    km_in = COALESCE(?, km_in), 
-    checkin_status = ?,
-    checkin_by = ?,
-    updated_at = datetime('now') 
-    WHERE id = ?`)
-    .run(km || null, status || null, req.user.id, id);
-  addLog(id, 'checked_in', { km, status, by: req.user.display_name }, req.user.id);
-  res.json({ message: 'Check-in erfolgreich' });
-});
-
-router.post('/bookings/:id/checkout', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const { km, status } = req.body;
-  d.prepare(`UPDATE bookings SET 
-    status = 'checked', 
-    checked_out_at = datetime('now'), 
-    km_out = COALESCE(?, km_out),
-    checkout_status = ?,
-    checkout_by = ?,
-    updated_at = datetime('now') 
-    WHERE id = ?`)
-    .run(km || null, status || null, req.user.id, id);
-  addLog(id, 'checked_out', { km, status, by: req.user.display_name }, req.user.id);
-  res.json({ message: 'Check-out erfolgreich' });
-});
-
-// ─── UNDO CHECK-IN/CHECK-OUT (Admin only) ────────────────────────────────
-router.delete('/bookings/:id/checkin', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  d.prepare(`UPDATE bookings SET 
-    checked_in_at = NULL, 
-    checkin_status = NULL,
-    checkin_by = NULL,
-    status = CASE WHEN checked_out_at IS NULL THEN 'new' ELSE status END,
-    updated_at = datetime('now') 
-    WHERE id = ?`).run(id);
-  addLog(id, 'undo_checkin', { by: req.user.display_name }, req.user.id);
-  res.json({ message: 'Check-in rückgängig gemacht' });
-});
-
-router.delete('/bookings/:id/checkout', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  d.prepare(`UPDATE bookings SET 
-    checked_out_at = NULL, 
-    checkout_status = NULL,
-    checkout_by = NULL,
-    status = CASE WHEN checked_in_at IS NULL THEN 'new' ELSE status END,
-    updated_at = datetime('now') 
-    WHERE id = ?`).run(id);
-  addLog(id, 'undo_checkout', { by: req.user.display_name }, req.user.id);
-  res.json({ message: 'Check-out rückgängig gemacht' });
-});
-
-// ─── SET STATUS (separate from check-in/out) ─────────────────────────────
-router.put('/bookings/:id/status', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const { checkin_status, checkout_status } = req.body;
-  
-  const updates = [];
-  const params = [];
-  
-  if (checkin_status !== undefined) {
-    updates.push('checkin_status = ?');
-    params.push(checkin_status);
-  }
-  if (checkout_status !== undefined) {
-    updates.push('checkout_status = ?');
-    params.push(checkout_status);
-  }
-  
-  if (updates.length === 0) {
-    return res.status(400).json({ error: 'Kein Status angegeben' });
-  }
-  
-  updates.push("updated_at = datetime('now')");
-  params.push(id);
-  
-  d.prepare(`UPDATE bookings SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-  addLog(id, 'status_changed', { checkin_status, checkout_status, by: req.user.display_name }, req.user.id);
-  res.json({ message: 'Status aktualisiert' });
-});
-
-router.post('/bookings/:id/pay', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const { method } = req.body;
-  d.prepare("UPDATE bookings SET paid = 1, paid_method = ?, paid_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
-    .run(method || 'Cash', id);
-  addLog(id, 'paid', { method }, req.user.id);
-  res.json({ message: 'Zahlung erfasst' });
-});
-
-router.post('/bookings/:id/noshow', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  d.prepare("UPDATE bookings SET status = 'noshow', updated_at = datetime('now') WHERE id = ?").run(id);
-  addLog(id, 'noshow', null, req.user.id);
-  res.json({ message: 'No-Show markiert' });
-});
-
-router.post('/bookings/:id/key', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const { handed_in } = req.body;
-  d.prepare("UPDATE bookings SET key_handed_in = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(handed_in ? 1 : 0, id);
-  addLog(id, handed_in ? 'key_in' : 'key_out', null, req.user.id);
-  res.json({ message: handed_in ? 'Schlüssel abgegeben' : 'Schlüssellos markiert' });
-});
-
-router.post('/bookings/:id/phone', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  d.prepare("UPDATE bookings SET phone_contacted = 1, updated_at = datetime('now') WHERE id = ?").run(id);
-  addLog(id, 'phone_called', null, req.user.id);
-  res.json({ message: 'Telefonat vermerkt' });
-});
-
-// ─── MANUAL BOOKING ─────────────────────────────────────────────────────
-
-router.post('/bookings', requireAuth, (req, res) => {
-  const d = getDb();
-  const b = req.body;
-  const today = new Date().toISOString().split('T')[0];
-
-  const result = d.prepare(`
-    INSERT INTO bookings (
-      company_id, type, status, name, phone, email, pax, plate, car, key_code,
-      date_in, time_in, date_out, time_out, flight_code, provider, price,
-      wash, comment, scraped_date, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    b.company_id || 'parkking', b.type || 'in', 'new',
-    b.name, b.phone, b.email, b.pax || 1,
-    b.plate, b.car, b.key_code,
-    b.date_in, b.time_in, b.date_out, b.time_out,
-    b.flight_code, b.provider || 'Park King', b.price || 0,
-    b.wash, b.comment, today, req.user.id
-  );
-
-  addLog(result.lastInsertRowid, 'created', b, req.user.id);
-  res.json({ id: result.lastInsertRowid, message: 'Buchung erstellt' });
-});
-
-// ─── LABELS ─────────────────────────────────────────────────────────────
-
-router.post('/labels', requireAuth, (req, res) => {
-  const d = getDb();
-  const { booking_id, plate, name } = req.body;
-  const result = d.prepare('INSERT INTO labels (booking_id, plate, name, status, printed_by) VALUES (?, ?, ?, ?, ?)')
-    .run(booking_id, plate, name, 'queued', req.user.id);
-  if (booking_id) addLog(booking_id, 'label_printed', { plate }, req.user.id);
-  // Simulate print completion
-  setTimeout(() => {
-    d.prepare("UPDATE labels SET status = 'done' WHERE id = ?").run(result.lastInsertRowid);
-  }, 2000);
-  res.json({ id: result.lastInsertRowid, message: 'Label erstellt' });
-});
-
-router.get('/labels', requireAuth, (req, res) => {
-  const d = getDb();
-  const labels = d.prepare(`
-    SELECT l.*, u.display_name as printed_by_name
-    FROM labels l LEFT JOIN users u ON l.printed_by = u.id
-    ORDER BY l.created_at DESC LIMIT 50
-  `).all();
-  res.json(labels);
-});
-
-// ─── SCRAPING ───────────────────────────────────────────────────────────
-
-// Track active scrapes
-const activeScrapes = {};
-
-router.post('/scrape', requireAuth, async (req, res) => {
-  const { company } = req.body;
-  const companyId = company || 'parkking';
-
-  if (activeScrapes[companyId]) {
-    return res.json({ message: 'Scrape läuft bereits', inProgress: true });
-  }
-
-  try {
-    activeScrapes[companyId] = true;
-    const result = await scrapeCompany(companyId);
-    delete activeScrapes[companyId];
-    res.json({ message: 'Scrape erfolgreich', ...result });
-  } catch (err) {
-    delete activeScrapes[companyId];
-    res.status(500).json({ error: 'Scrape fehlgeschlagen', detail: err.message });
-  }
-});
-
-router.post('/scrape/all', requireAuth, requireAdmin, async (req, res) => {
-  try {
-    await autoScrapeAll();
-    res.json({ message: 'Alle Firmen gescrapt' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/scrape/log', requireAuth, (req, res) => {
-  const d = getDb();
-  const log = d.prepare('SELECT * FROM scrape_log ORDER BY created_at DESC LIMIT 20').all();
-  res.json(log);
-});
-
-// ─── YEAR SCRAPE (one-time full import) ─────────────────────────────────
-
-const activeYearScrapes = {};
-
-router.post('/scrape/year', requireAuth, requireAdmin, async (req, res) => {
-  const { company } = req.body;
-  const companyId = company || 'parkking';
-
-  if (activeYearScrapes[companyId]) {
-    return res.json({ message: 'Jahres-Import läuft bereits', inProgress: true });
-  }
-
-  try {
-    activeYearScrapes[companyId] = true;
-    const result = await scrapeYearView(companyId);
-    delete activeYearScrapes[companyId];
-    res.json({ message: 'Jahres-Import erfolgreich', ...result });
-  } catch (err) {
-    delete activeYearScrapes[companyId];
-    res.status(500).json({ error: 'Jahres-Import fehlgeschlagen', detail: err.message });
-  }
-});
-
-// ─── STATS / DASHBOARD ─────────────────────────────────────────────────
-
-router.get('/stats', requireAuth, (req, res) => {
-  const d = getDb();
-  const today = new Date().toISOString().split('T')[0];
-
-  const todayStats = d.prepare(`
-    SELECT
-      COUNT(*) as total,
-      SUM(CASE WHEN type = 'in' THEN 1 ELSE 0 END) as annahmen,
-      SUM(CASE WHEN type = 'out' THEN 1 ELSE 0 END) as rueckgaben,
-      SUM(CASE WHEN status IN ('new', 'pending') THEN 1 ELSE 0 END) as offen,
-      SUM(CASE WHEN status = 'checked' THEN 1 ELSE 0 END) as erledigt,
-      SUM(CASE WHEN status = 'noshow' THEN 1 ELSE 0 END) as noshow,
-      SUM(COALESCE(price, 0)) as total_due,
-      SUM(CASE WHEN paid = 1 THEN COALESCE(price, 0) ELSE 0 END) as total_paid
-    FROM bookings WHERE scraped_date = ?
-  `).get(today);
-
-  const lastScrape = d.prepare('SELECT * FROM scrape_log ORDER BY created_at DESC LIMIT 1').get();
-
-  res.json({ today: todayStats, lastScrape, date: today });
-});
-
-// ─── SETTINGS (admin) ───────────────────────────────────────────────────
-
-router.get('/settings', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const settings = d.prepare('SELECT * FROM settings').all();
-  const obj = {};
-  settings.forEach(s => obj[s.key] = s.value);
-  res.json(obj);
-});
-
-router.put('/settings', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const upsert = d.prepare("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')");
-  const tx = d.transaction((entries) => {
-    for (const [key, value] of Object.entries(entries)) {
-      upsert.run(key, String(value));
-    }
-  });
-  tx(req.body);
-  res.json({ message: 'Einstellungen gespeichert' });
-});
-
-// ─── TASKS (daily recurring) ────────────────────────────────────────────
-
-// Get all tasks with today's completion status
-router.get('/tasks', requireAuth, (req, res) => {
-  const d = getDb();
-  const date = req.query.date || new Date().toISOString().split('T')[0];
-  const tasks = d.prepare(`
-    SELECT t.*, 
-      tc.user_id as completed_by_id,
-      tc.completed_at,
-      u.display_name as completed_by_name
-    FROM tasks t
-    LEFT JOIN task_completions tc ON t.id = tc.task_id AND tc.date = ?
-    LEFT JOIN users u ON tc.user_id = u.id
-    WHERE t.active = 1
-    ORDER BY t.sort_order ASC, t.id ASC
-  `).all(date);
-  res.json({ tasks, date });
-});
-
-// Create task (admin only)
-router.post('/tasks', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { title, description } = req.body;
-  if (!title) return res.status(400).json({ error: 'Titel erforderlich' });
-  const maxOrder = d.prepare('SELECT MAX(sort_order) as m FROM tasks WHERE active = 1').get();
-  const result = d.prepare('INSERT INTO tasks (title, description, sort_order, created_by) VALUES (?, ?, ?, ?)')
-    .run(title, description || null, (maxOrder?.m || 0) + 1, req.user.id);
-  res.json({ id: result.lastInsertRowid, message: 'Aufgabe erstellt' });
-});
-
-// Update task (admin only)
-router.put('/tasks/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { title, description, sort_order } = req.body;
-  const fields = [];
-  const values = [];
-  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
-  if (description !== undefined) { fields.push('description = ?'); values.push(description); }
-  if (sort_order !== undefined) { fields.push('sort_order = ?'); values.push(sort_order); }
-  if (!fields.length) return res.status(400).json({ error: 'Keine Änderungen' });
-  values.push(parseInt(req.params.id));
-  d.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  res.json({ message: 'Aufgabe aktualisiert' });
-});
-
-// Delete task (admin only) — soft delete
-router.delete('/tasks/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  d.prepare('UPDATE tasks SET active = 0 WHERE id = ?').run(parseInt(req.params.id));
-  res.json({ message: 'Aufgabe entfernt' });
-});
-
-// Toggle task completion for today
-router.post('/tasks/:id/toggle', requireAuth, (req, res) => {
-  const d = getDb();
-  const taskId = parseInt(req.params.id);
-  const date = new Date().toISOString().split('T')[0];
-  
-  const existing = d.prepare('SELECT id FROM task_completions WHERE task_id = ? AND date = ?').get(taskId, date);
-  if (existing) {
-    d.prepare('DELETE FROM task_completions WHERE id = ?').run(existing.id);
-    res.json({ completed: false, message: 'Aufgabe als offen markiert' });
-  } else {
-    d.prepare('INSERT INTO task_completions (task_id, date, user_id) VALUES (?, ?, ?)')
-      .run(taskId, date, req.user.id);
-    res.json({ completed: true, message: 'Aufgabe erledigt ✓' });
-  }
-});
-
-// Task completion history (admin)
-router.get('/tasks/history', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const days = parseInt(req.query.days) || 7;
-  const history = d.prepare(`
-    SELECT tc.*, t.title as task_title, u.display_name as user_name
-    FROM task_completions tc
-    JOIN tasks t ON tc.task_id = t.id
-    JOIN users u ON tc.user_id = u.id
-    ORDER BY tc.completed_at DESC
-    LIMIT ?
-  `).all(days * 20);
-  res.json(history);
-});
-
-// ─── SHIFT TEMPLATES ────────────────────────────────────────────────────
-
-router.get('/shift-templates', requireAuth, (req, res) => {
-  const d = getDb();
-  const templates = d.prepare('SELECT * FROM shift_templates WHERE active = 1 ORDER BY start_time ASC').all();
-  res.json(templates);
-});
-
-router.post('/shift-templates', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { name, start_time, end_time, color } = req.body;
-  if (!name || !start_time || !end_time) return res.status(400).json({ error: 'Name, Start und Ende erforderlich' });
-  const result = d.prepare('INSERT INTO shift_templates (name, start_time, end_time, color) VALUES (?, ?, ?, ?)')
-    .run(name, start_time, end_time, color || '#CC6CE7');
-  res.json({ id: result.lastInsertRowid, message: 'Vorlage erstellt' });
-});
-
-router.put('/shift-templates/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { name, start_time, end_time, color } = req.body;
-  d.prepare('UPDATE shift_templates SET name = COALESCE(?, name), start_time = COALESCE(?, start_time), end_time = COALESCE(?, end_time), color = COALESCE(?, color) WHERE id = ?')
-    .run(name, start_time, end_time, color, parseInt(req.params.id));
-  res.json({ message: 'Vorlage aktualisiert' });
-});
-
-router.delete('/shift-templates/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  d.prepare('UPDATE shift_templates SET active = 0 WHERE id = ?').run(parseInt(req.params.id));
-  res.json({ message: 'Vorlage entfernt' });
-});
-
-// ─── SHIFTS (schedule) ─────────────────────────────────────────────────
-
-// Get shifts for a week (date = any day in the week, returns Mon-Sun)
-router.get('/shifts', requireAuth, (req, res) => {
-  const d = getDb();
-  const dateParam = req.query.date || new Date().toISOString().split('T')[0];
-  const userId = req.query.user_id;
-
-  // Calculate week boundaries (Mon-Sun)
-  const refDate = new Date(dateParam + 'T12:00:00');
-  const dayOfWeek = refDate.getDay(); // 0=Sun, 1=Mon...
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const monday = new Date(refDate);
-  monday.setDate(refDate.getDate() + mondayOffset);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  const weekStart = monday.toISOString().split('T')[0];
-  const weekEnd = sunday.toISOString().split('T')[0];
-
-  let sql = `
-    SELECT s.*, u.display_name as user_name, u.username,
-      st.name as template_name, st.color as template_color
-    FROM shifts s
-    JOIN users u ON s.user_id = u.id
-    LEFT JOIN shift_templates st ON s.template_id = st.id
-    WHERE s.date >= ? AND s.date <= ?
-  `;
-  const params = [weekStart, weekEnd];
-
-  if (userId) {
-    sql += ' AND s.user_id = ?';
-    params.push(parseInt(userId));
-  }
-
-  sql += ' ORDER BY s.date ASC, s.start_time ASC';
-
-  const shifts = d.prepare(sql).all(...params);
-
-  // Calculate hours per user for this week
-  const hoursByUser = {};
-  for (const s of shifts) {
-    if (!hoursByUser[s.user_id]) hoursByUser[s.user_id] = { name: s.user_name, hours: 0, shifts: 0 };
-    const hours = calcShiftHours(s.start_time, s.end_time, s.break_min);
-    hoursByUser[s.user_id].hours += hours;
-    hoursByUser[s.user_id].shifts += 1;
-  }
-
-  res.json({ shifts, weekStart, weekEnd, hoursByUser });
-});
-
-// Create shift (admin only)
-router.post('/shifts', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { user_id, date, template_id, start_time, end_time, break_min, note } = req.body;
-  if (!user_id || !date || !start_time || !end_time) {
-    return res.status(400).json({ error: 'User, Datum, Start und Ende erforderlich' });
-  }
-  const result = d.prepare(`
-    INSERT INTO shifts (user_id, date, template_id, start_time, end_time, break_min, note, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(user_id, date, template_id || null, start_time, end_time, break_min || 0, note || null, req.user.id);
-  res.json({ id: result.lastInsertRowid, message: 'Schicht erstellt' });
-});
-
-// Update shift (admin only)
-router.put('/shifts/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { user_id, date, template_id, start_time, end_time, break_min, note } = req.body;
-  d.prepare(`
-    UPDATE shifts SET
-      user_id = COALESCE(?, user_id),
-      date = COALESCE(?, date),
-      template_id = ?,
-      start_time = COALESCE(?, start_time),
-      end_time = COALESCE(?, end_time),
-      break_min = COALESCE(?, break_min),
-      note = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(user_id, date, template_id || null, start_time, end_time, break_min, note || null, parseInt(req.params.id));
-  res.json({ message: 'Schicht aktualisiert' });
-});
-
-// Delete shift (admin only)
-router.delete('/shifts/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  d.prepare('DELETE FROM shifts WHERE id = ?').run(parseInt(req.params.id));
-  res.json({ message: 'Schicht gelöscht' });
-});
-
-// ─── START UNPLANNED SHIFT ───────────────────────────────────────────────
-router.post('/shifts/start-unplanned', requireAuth, (req, res) => {
-  const d = getDb();
-  const { date, start_time } = req.body;
-  
-  if (!date || !start_time) {
-    return res.status(400).json({ error: 'Datum und Startzeit erforderlich' });
-  }
-  
-  // Prüfe ob heute schon eine Schicht existiert
-  const existing = d.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ?').get(req.user.id, date);
-  if (existing) {
-    return res.status(400).json({ error: 'Du hast heute bereits eine Schicht' });
-  }
-  
-  // Erstelle ungeplante Schicht (end_time = start_time, wird beim Checkout aktualisiert)
-  const result = d.prepare(`
-    INSERT INTO shifts (user_id, date, start_time, end_time, actual_start, note, created_by)
-    VALUES (?, ?, ?, ?, ?, 'Ungeplante Schicht', ?)
-  `).run(req.user.id, date, start_time, start_time, start_time, req.user.id);
-  
-  // Log eintragen
-  d.prepare(`
-    INSERT INTO shift_log (shift_id, user_id, action, details)
-    VALUES (?, ?, 'unplanned_start', ?)
-  `).run(result.lastInsertRowid, req.user.id, JSON.stringify({ start_time }));
-  
-  res.json({ 
-    id: result.lastInsertRowid, 
-    message: 'Ungeplante Schicht gestartet',
-    start_time 
-  });
-});
-
-// ─── SHIFT CHECK-IN ──────────────────────────────────────────────────────
-router.post('/shifts/:id/checkin', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const { is_late } = req.body;
-  
-  // Prüfe ob Schicht dem User gehört
-  const shift = d.prepare('SELECT * FROM shifts WHERE id = ?').get(id);
-  if (!shift) return res.status(404).json({ error: 'Schicht nicht gefunden' });
-  if (shift.user_id !== req.user.id) {
-    return res.status(403).json({ error: 'Das ist nicht deine Schicht' });
-  }
-  if (shift.actual_start) {
-    return res.status(400).json({ error: 'Bereits eingecheckt' });
-  }
-  
-  const now = new Date();
-  const actualTime = now.toTimeString().slice(0, 5);
-  
-  // Berechne Verspätung
-  const [startH, startM] = shift.start_time.split(':').map(Number);
-  const scheduledMinutes = startH * 60 + startM;
-  const actualMinutes = now.getHours() * 60 + now.getMinutes();
-  const lateMinutes = Math.max(0, actualMinutes - scheduledMinutes);
-  const wasLate = lateMinutes > 0 ? 1 : 0;
-  
-  // Wenn verspätet, aktualisiere auch die geplante Startzeit
-  const newStartTime = wasLate ? actualTime : shift.start_time;
-  
-  d.prepare(`
-    UPDATE shifts SET 
-      actual_start = ?,
-      start_time = ?,
-      was_late = ?,
-      late_minutes = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(actualTime, newStartTime, wasLate, lateMinutes, id);
-  
-  // Log eintragen
-  const action = wasLate ? 'late_checkin' : 'checkin';
-  d.prepare(`
-    INSERT INTO shift_log (shift_id, user_id, action, details)
-    VALUES (?, ?, ?, ?)
-  `).run(id, req.user.id, action, JSON.stringify({ 
-    actual_time: actualTime, 
-    scheduled_time: shift.start_time,
-    late_minutes: lateMinutes 
-  }));
-  
-  res.json({ 
-    message: wasLate ? `Verspätet eingecheckt (${lateMinutes} Min.)` : 'Eingecheckt',
-    actual_start: actualTime,
-    was_late: wasLate,
-    late_minutes: lateMinutes
-  });
-});
-
-// ─── SHIFT CHECK-OUT ─────────────────────────────────────────────────────
-router.post('/shifts/:id/checkout', requireAuth, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  
-  // Prüfe ob Schicht dem User gehört
-  const shift = d.prepare('SELECT * FROM shifts WHERE id = ?').get(id);
-  if (!shift) return res.status(404).json({ error: 'Schicht nicht gefunden' });
-  if (shift.user_id !== req.user.id) {
-    return res.status(403).json({ error: 'Das ist nicht deine Schicht' });
-  }
-  if (!shift.actual_start) {
-    return res.status(400).json({ error: 'Noch nicht eingecheckt' });
-  }
-  if (shift.actual_end) {
-    return res.status(400).json({ error: 'Bereits ausgecheckt' });
-  }
-  
-  const actualTime = new Date().toTimeString().slice(0, 5);
-  
-  d.prepare(`
-    UPDATE shifts SET 
-      actual_end = ?,
-      end_time = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(actualTime, actualTime, id);
-  
-  // Log eintragen
-  d.prepare(`
-    INSERT INTO shift_log (shift_id, user_id, action, details)
-    VALUES (?, ?, 'checkout', ?)
-  `).run(id, req.user.id, JSON.stringify({ actual_time: actualTime }));
-  
-  res.json({ message: 'Ausgecheckt', actual_end: actualTime });
-});
-
-// Monthly hours summary
-router.get('/shifts/hours', requireAuth, (req, res) => {
-  const d = getDb();
-  const month = req.query.month || new Date().toISOString().slice(0, 7); // YYYY-MM
-  const monthStart = month + '-01';
-  const nextMonth = new Date(month + '-01T12:00:00');
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-  const monthEnd = nextMonth.toISOString().split('T')[0];
-
-  const shifts = d.prepare(`
-    SELECT s.user_id, u.display_name as user_name, s.start_time, s.end_time, s.break_min
-    FROM shifts s
-    JOIN users u ON s.user_id = u.id
-    WHERE s.date >= ? AND s.date < ?
-    ORDER BY s.user_id
-  `).all(monthStart, monthEnd);
-
-  const summary = {};
-  for (const s of shifts) {
-    if (!summary[s.user_id]) summary[s.user_id] = { name: s.user_name, totalHours: 0, totalShifts: 0 };
-    summary[s.user_id].totalHours += calcShiftHours(s.start_time, s.end_time, s.break_min);
-    summary[s.user_id].totalShifts += 1;
-  }
-
-  res.json({ month, summary });
-});
-
-// Helper: calculate shift hours
-function calcShiftHours(startTime, endTime, breakMin) {
-  const [sh, sm] = startTime.split(':').map(Number);
-  const [eh, em] = endTime.split(':').map(Number);
-  let startMinutes = sh * 60 + sm;
-  let endMinutes = eh * 60 + em;
-  // Handle overnight (e.g. 15:00 - 00:00 or 22:00 - 06:00)
-  if (endMinutes <= startMinutes) endMinutes += 24 * 60;
-  const totalMinutes = endMinutes - startMinutes - (breakMin || 0);
-  return Math.max(0, totalMinutes / 60);
+  return undefined;
 }
 
-// ─── DAMAGES (Schadensprotokoll) ────────────────────────────────────────
-
-// Generate next damage number
-function nextDamageNumber() {
-  const d = getDb();
-  const year = new Date().getFullYear();
-  const last = d.prepare("SELECT damage_number FROM damages WHERE damage_number LIKE ? ORDER BY id DESC LIMIT 1")
-    .get(`DMG-${year}-%`);
-  if (last) {
-    const num = parseInt(last.damage_number.split('-')[2]) + 1;
-    return `DMG-${year}-${String(num).padStart(4, '0')}`;
+async function getBrowser() {
+  if (!browserInstance || !browserInstance.isConnected()) {
+    const executablePath = await findChromePath();
+    console.log('[Scraper] Chrome at:', executablePath || 'puppeteer default');
+    browserInstance = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+      ...(executablePath ? { executablePath } : {})
+    });
   }
-  return `DMG-${year}-0001`;
+  return browserInstance;
 }
 
-// List all damages
-router.get('/damages', requireAuth, (req, res) => {
+// ─── Scrape bookings from ParkingPro ────────────────────────────────────
+
+async function scrapeCompany(companyId) {
   const d = getDb();
-  const { status, search } = req.query;
-  let sql = `SELECT dm.*, u.display_name as created_by_name,
-    (SELECT COUNT(*) FROM damage_photos dp WHERE dp.damage_id = dm.id) as photo_count
-    FROM damages dm LEFT JOIN users u ON dm.created_by = u.id WHERE 1=1`;
-  const params = [];
-  if (status) { sql += ' AND dm.status = ?'; params.push(status); }
-  if (search) {
-    sql += ' AND (dm.plate LIKE ? OR dm.first_name LIKE ? OR dm.last_name LIKE ? OR dm.damage_number LIKE ?)';
-    const s = `%${search}%`; params.push(s, s, s, s);
+  const company = d.prepare('SELECT * FROM companies WHERE id = ? AND active = 1').get(companyId);
+  if (!company) throw new Error('Firma nicht gefunden: ' + companyId);
+  if (!company.email || !company.password) throw new Error('Login-Daten fehlen für ' + company.name);
+
+  const startTime = Date.now();
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+
+  try {
+    await page.setViewport({ width: 1400, height: 900 });
+    console.log(`[Scraper][${company.name}] Navigating...`);
+    await page.goto(company.base_url, { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Login
+    console.log(`[Scraper][${company.name}] Login...`);
+    await page.goto(company.base_url + '/authentication/login', { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 3000));
+
+    const hasPasswordField = await page.evaluate(() => !!document.querySelector('input[type="password"]'));
+    if (hasPasswordField) {
+      await page.evaluate((email) => {
+        const selectors = ['input[type="email"]','input[name="email"]','input[name="username"]','#email','#username','input[type="text"]'];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.type !== 'password') {
+            el.value = email;
+            el.dispatchEvent(new Event('input', {bubbles:true}));
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            return;
+          }
+        }
+      }, company.email);
+
+      await page.evaluate((pass) => {
+        const el = document.querySelector('input[type="password"]');
+        if (el) { el.value = pass; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }
+      }, company.password);
+
+      await new Promise(r => setTimeout(r, 500));
+      await page.evaluate(() => {
+        const btns = ['button[type="submit"]','input[type="submit"]','.btn-primary','button.login','.btn-login'];
+        for (const sel of btns) { const el = document.querySelector(sel); if (el) { el.click(); return; } }
+        const form = document.querySelector('form');
+        if (form) { const btn = form.querySelector('button, input[type="submit"]'); if (btn) btn.click(); }
+      });
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    // Day view
+    console.log(`[Scraper][${company.name}] Day view...`);
+    await page.goto(company.base_url + '/#view=day-all', { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 5000));
+
+    // Wait for data rows
+    let retries = 0, rowCount = 0;
+    while (retries < 10) {
+      rowCount = await page.evaluate(() => document.querySelectorAll('tr[data-uid]').length);
+      if (rowCount > 0) break;
+      await new Promise(r => setTimeout(r, 2000));
+      retries++;
+    }
+
+    // Extract bookings
+    console.log(`[Scraper][${company.name}] Extracting ${rowCount} rows...`);
+    const rawBookings = await page.evaluate(() => {
+      const rows = document.querySelectorAll('tr[data-uid]');
+      const results = [];
+      for (const row of rows) {
+        const getField = (field) => {
+          const cell = row.querySelector(`td[data-field="${field}"]`);
+          return cell ? (cell.textContent || '').trim() : '';
+        };
+        const name = getField('fullName()').replace(/^ParkKing:\s*/i, '').trim();
+        const kennzeichen = getField('car.licensePlate');
+        const zeit = getField('dayView.time');
+        const parkdatum = getField('dayView.arrivalDate');
+        const rueckgabe = getField('dayView.departureDate');
+        const personen = getField('numberOfPersons');
+        const tage = getField('parkedDaysCount()');
+        const flug = getField('dayView.flightNumber');
+        const telefon = getField('contactInformation.phone');
+        const fahrzeug = getField('car.description');
+        const code = getField('reservationCode');
+        const uid = row.getAttribute('data-uid');
+        const classList = row.className || '';
+        let type = 'unknown';
+        if (classList.includes('bg-success')) type = 'checkin';
+        if (classList.includes('bg-danger')) type = 'checkout';
+        if (kennzeichen || name) {
+          results.push({ name, kennzeichen, zeit, parkdatum, rueckgabe, personen, tage, flug, telefon, fahrzeug, code, type, uid });
+        }
+      }
+      return results;
+    });
+
+    // Get departure times for check-ins
+    const checkins = rawBookings.filter(b => b.type === 'checkin');
+    console.log(`[Scraper][${company.name}] Getting departure times for ${checkins.length} check-ins...`);
+
+    for (let i = 0; i < checkins.length; i++) {
+      try {
+        const clicked = await page.evaluate((uid) => {
+          const row = document.querySelector(`tr[data-uid="${uid}"]`);
+          if (row) { row.click(); return true; }
+          return false;
+        }, checkins[i].uid);
+        if (!clicked) continue;
+
+        await page.waitForFunction(() => {
+          const el = document.querySelector('span[data-bind*="selectedEntity.departureDate"][data-format="g"]');
+          return el && el.textContent.trim().length > 0;
+        }, { timeout: 8000 }).catch(() => {});
+        await new Promise(r => setTimeout(r, 500));
+
+        const departureFull = await page.evaluate(() => {
+          const el = document.querySelector('span[data-bind*="selectedEntity.departureDate"][data-format="g"]');
+          return el ? el.textContent.trim() : '';
+        });
+
+        if (departureFull) {
+          checkins[i].rueckgabeVoll = departureFull;
+          const parts = departureFull.split(' ');
+          if (parts.length >= 2) {
+            checkins[i].rueckgabeDatum = parts[0];
+            checkins[i].rueckgabeZeit = parts[1];
+          }
+        }
+      } catch { /* continue */ }
+    }
+
+    // Display date
+    const displayDate = await page.evaluate(() => {
+      const dateEl = document.querySelector('[data-role="datefilter"] .k-input, .entity-list-filter input[type="date"]');
+      if (dateEl && dateEl.value) return dateEl.value;
+      return new Date().toISOString().split('T')[0];
+    });
+
+    const scrapedDate = displayDate || new Date().toISOString().split('T')[0];
+
+    // Merge check-in departure data back
+    const allBookings = rawBookings.map(b => {
+      const ci = checkins.find(c => c.uid === b.uid);
+      return ci || b;
+    });
+
+    // Upsert into database
+    let created = 0, updated = 0;
+    for (const b of allBookings) {
+      const result = upsertBookingFromScrape(b, companyId, scrapedDate);
+      if (result.action === 'created') created++;
+      else updated++;
+    }
+
+    const duration = Date.now() - startTime;
+
+    // Log the scrape
+    d.prepare('INSERT INTO scrape_log (company_id, date, bookings_found, bookings_new, bookings_updated, duration_ms) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(companyId, scrapedDate, allBookings.length, created, updated, duration);
+
+    console.log(`[Scraper][${company.name}] Done! ${allBookings.length} found, ${created} new, ${updated} updated (${duration}ms)`);
+
+    return {
+      company: company.name,
+      date: scrapedDate,
+      total: allBookings.length,
+      created,
+      updated,
+      duration
+    };
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    d.prepare('INSERT INTO scrape_log (company_id, date, error, duration_ms) VALUES (?, ?, ?, ?)')
+      .run(companyId, new Date().toISOString().split('T')[0], error.message, duration);
+    throw error;
+  } finally {
+    await page.close();
   }
-  sql += ' ORDER BY dm.created_at DESC';
-  res.json(d.prepare(sql).all(...params));
-});
+}
 
-// Get single damage with photos
-router.get('/damages/:id', requireAuth, (req, res) => {
-  const d = getDb();
-  const damage = d.prepare(`SELECT dm.*, u.display_name as created_by_name
-    FROM damages dm LEFT JOIN users u ON dm.created_by = u.id WHERE dm.id = ?`).get(parseInt(req.params.id));
-  if (!damage) return res.status(404).json({ error: 'Schaden nicht gefunden' });
-  const photos = d.prepare('SELECT * FROM damage_photos WHERE damage_id = ? ORDER BY created_at ASC').all(damage.id);
-  res.json({ damage, photos });
-});
+// ─── Scrape YEAR VIEW (one-time full import) ────────────────────────────
 
-// Create damage
-router.post('/damages', requireAuth, (req, res) => {
+// Year view URLs with correct filter params
+const YEAR_VIEW_URLS = {
+  parkking: '/#view=reservations.year&filters=JTdCJTIyZGF0ZVJhbmdlRmllbGQlMjIlM0ElMjJhcnJpdmFsRGF0ZSUyMiU3RA%3D%3D',
+  psfmsf: '/#view=reservations.year&filters=JTdCJTIyZGF0ZVJhbmdlRmllbGQlMjIlM0ElMjJhcnJpdmFsRGF0ZSUyMiU3RA%3D%3D'
+};
+
+async function scrapeYearView(companyId) {
   const d = getDb();
-  const { first_name, last_name, plate, car_brand, car_color, incident_time, description } = req.body;
-  if (!first_name || !last_name || !plate || !description) {
-    return res.status(400).json({ error: 'Vorname, Nachname, Kennzeichen und Beschreibung erforderlich' });
+  const company = d.prepare('SELECT * FROM companies WHERE id = ? AND active = 1').get(companyId);
+  if (!company) throw new Error('Firma nicht gefunden: ' + companyId);
+  if (!company.email || !company.password) throw new Error('Login-Daten fehlen für ' + company.name);
+
+  const startTime = Date.now();
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+
+  try {
+    await page.setViewport({ width: 1400, height: 900 });
+    console.log(`[YearScraper][${company.name}] Navigating...`);
+    await page.goto(company.base_url, { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Login
+    console.log(`[YearScraper][${company.name}] Login...`);
+    await page.goto(company.base_url + '/authentication/login', { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 3000));
+
+    const hasPasswordField = await page.evaluate(() => !!document.querySelector('input[type="password"]'));
+    if (hasPasswordField) {
+      await page.evaluate((email) => {
+        const selectors = ['input[type="email"]','input[name="email"]','input[name="username"]','#email','#username','input[type="text"]'];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.type !== 'password') {
+            el.value = email;
+            el.dispatchEvent(new Event('input', {bubbles:true}));
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            return;
+          }
+        }
+      }, company.email);
+
+      await page.evaluate((pass) => {
+        const el = document.querySelector('input[type="password"]');
+        if (el) { el.value = pass; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }
+      }, company.password);
+
+      await new Promise(r => setTimeout(r, 500));
+      await page.evaluate(() => {
+        const btns = ['button[type="submit"]','input[type="submit"]','.btn-primary','button.login','.btn-login'];
+        for (const sel of btns) { const el = document.querySelector(sel); if (el) { el.click(); return; } }
+        const form = document.querySelector('form');
+        if (form) { const btn = form.querySelector('button, input[type="submit"]'); if (btn) btn.click(); }
+      });
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {});
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    // Navigate to year/reservations view with correct filter URL
+    const yearPath = YEAR_VIEW_URLS[companyId] || '/#view=reservations.year&filters=JTdCJTIyZGF0ZVJhbmdlRmllbGQlMjIlM0ElMjJhcnJpdmFsRGF0ZSUyMiU3RA%3D%3D';
+    console.log(`[YearScraper][${company.name}] Year view: ${yearPath}`);
+    await page.goto(company.base_url + yearPath, { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 8000));
+
+    // Wait for initial data rows
+    let retries = 0, rowCount = 0;
+    while (retries < 15) {
+      rowCount = await page.evaluate(() => document.querySelectorAll('tr[data-uid]').length);
+      if (rowCount > 0) break;
+      await new Promise(r => setTimeout(r, 3000));
+      retries++;
+    }
+
+    // Read total count from the page header (e.g. "938 Reservierungen gefunden")
+    const totalExpected = await page.evaluate(() => {
+      const text = document.body.innerText || '';
+      const match = text.match(/(\d+)\s*Reservierungen?\s*gefunden/i);
+      return match ? parseInt(match[1]) : 0;
+    });
+    console.log(`[YearScraper][${company.name}] Initial rows: ${rowCount}, total expected: ${totalExpected}`);
+
+    // ──────────────────────────────────────────────────────────────────
+    // Kendo UI uses VIRTUAL SCROLLING: it only renders ~16-20 rows at
+    // a time and swaps them as you scroll. We must:
+    //   1. Extract currently visible rows
+    //   2. Scroll down a bit
+    //   3. Extract again (new UIDs = new bookings)
+    //   4. Repeat until we've seen all rows
+    // We collect into a Map keyed by UID to deduplicate.
+    // ──────────────────────────────────────────────────────────────────
+
+    // Debug: log all data-field attributes from the first row
+    const allFields = await page.evaluate(() => {
+      const row = document.querySelector('tr[data-uid]');
+      if (!row) return [];
+      const cells = row.querySelectorAll('td[data-field]');
+      return Array.from(cells).map(c => ({ field: c.getAttribute('data-field'), text: (c.textContent || '').trim().substring(0, 40) }));
+    });
+    console.log(`[YearScraper][${company.name}] Available fields:`, JSON.stringify(allFields));
+
+    const extractVisibleRows = async () => {
+      return await page.evaluate(() => {
+        const rows = document.querySelectorAll('tr[data-uid]');
+        const results = [];
+        for (const row of rows) {
+          const getField = (field) => {
+            const cell = row.querySelector(`td[data-field="${field}"]`);
+            return cell ? (cell.textContent || '').trim() : '';
+          };
+
+          const name = getField('fullName()') || getField('customer.fullName()') || '';
+          const cleanName = name.replace(/^ParkKing:\s*/i, '').trim();
+          const kennzeichen = getField('car.licensePlate') || getField('licensePlate') || '';
+          
+          const arrivalRaw = getField('arrivalDate') || getField('dayView.arrivalDate') || '';
+          const departureRaw = getField('departureDate') || getField('dayView.departureDate') || '';
+          
+          let parkdatum = arrivalRaw, zeit = '';
+          const arrParts = arrivalRaw.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
+          if (arrParts) { parkdatum = arrParts[1]; zeit = arrParts[2]; }
+          
+          let rueckgabe = departureRaw, rueckgabeZeit = '';
+          const depParts = departureRaw.match(/^(.+?)\s+(\d{1,2}:\d{2})/);
+          if (depParts) { rueckgabe = depParts[1]; rueckgabeZeit = depParts[2]; }
+
+          const personen = getField('numberOfPersons') || '';
+          const tage = getField('parkedDaysCount()') || getField('numberOfDays') || '';
+          const flug = getField('flightNumber') || getField('dayView.flightNumber') || getField('arrivalFlightNumber') || '';
+          const flugRueck = getField('departureFlightNumber') || '';
+          const telefon = getField('contactInformation.phone') || getField('phone') || '';
+          const fahrzeug = getField('car.description') || getField('carDescription') || '';
+          const code = getField('reservationCode') || '';
+          const uid = row.getAttribute('data-uid');
+
+          // Price fields — try various possible field names
+          const priceRaw = getField('totalPrice') || getField('price') || getField('totalAmount') 
+            || getField('amount') || getField('outstandingAmount') || getField('revenue')
+            || getField('invoiceAmount') || getField('calculatedPrice') || getField('total')
+            || getField('value') || getField('Wert') || '';
+
+          if (uid && (kennzeichen || cleanName)) {
+            results.push({
+              name: cleanName, kennzeichen, parkdatum, rueckgabe,
+              zeit, rueckgabeZeit,
+              personen, tage, flug, flugRueck, telefon, fahrzeug, code, uid,
+              priceRaw,
+              type: 'checkin'
+            });
+          }
+        }
+        return results;
+      });
+    };
+
+    // Collect all bookings by scrolling through the virtual grid
+    const allCollected = new Map();
+
+    // Extract initial visible rows
+    const initial = await extractVisibleRows();
+    for (const b of initial) allCollected.set(b.uid, b);
+    console.log(`[YearScraper][${company.name}] Collected so far: ${allCollected.size}`);
+
+    // Debug: find the actual scroll container
+    const scrollDebug = await page.evaluate(() => {
+      const selectors = [
+        '.k-grid-content',
+        '.k-virtual-scrollable-wrap', 
+        '.k-grid-content-locked',
+        '.k-grid .k-grid-content',
+        '[data-role="grid"] .k-grid-content',
+        '.k-grid-content table',
+        '.k-scrollbar',
+        '.entity-list .k-grid-content',
+        '.k-grid-content > .k-virtual-scrollable-wrap',
+      ];
+      const info = [];
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+          info.push({
+            selector: sel,
+            scrollHeight: el.scrollHeight,
+            scrollTop: el.scrollTop,
+            clientHeight: el.clientHeight,
+            overflow: getComputedStyle(el).overflow + ' / ' + getComputedStyle(el).overflowY,
+            tag: el.tagName,
+            classes: el.className.substring(0, 100)
+          });
+        }
+      }
+      // Also check all elements with overflow auto/scroll
+      const allScrollable = [];
+      document.querySelectorAll('*').forEach(el => {
+        const style = getComputedStyle(el);
+        if ((style.overflow === 'auto' || style.overflow === 'scroll' || 
+             style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+            el.scrollHeight > el.clientHeight + 50) {
+          allScrollable.push({
+            tag: el.tagName,
+            classes: el.className.substring(0, 80),
+            scrollHeight: el.scrollHeight,
+            clientHeight: el.clientHeight,
+            scrollTop: el.scrollTop
+          });
+        }
+      });
+      return { known: info, scrollable: allScrollable.slice(0, 10) };
+    });
+    console.log(`[YearScraper][${company.name}] Scroll containers:`, JSON.stringify(scrollDebug, null, 2));
+
+    // Scroll incrementally through the grid
+    let stableRounds = 0;
+    let lastCollectedSize = allCollected.size;
+
+    for (let scrollAttempt = 0; scrollAttempt < 500; scrollAttempt++) {
+      // Scroll: find the scrollable container and scroll it
+      const scrollResult = await page.evaluate((attempt) => {
+        // Try all possible scrollable containers
+        const candidates = [];
+        document.querySelectorAll('*').forEach(el => {
+          const style = getComputedStyle(el);
+          if ((style.overflow === 'auto' || style.overflow === 'scroll' || 
+               style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+              el.scrollHeight > el.clientHeight + 50) {
+            candidates.push(el);
+          }
+        });
+
+        // Also try known Kendo selectors
+        const kendo = document.querySelector('.k-grid-content') 
+          || document.querySelector('.k-virtual-scrollable-wrap');
+        if (kendo && !candidates.includes(kendo)) candidates.unshift(kendo);
+
+        let scrolled = false;
+        for (const container of candidates) {
+          const before = container.scrollTop;
+          const maxScroll = container.scrollHeight - container.clientHeight;
+          if (before < maxScroll - 5) {
+            container.scrollTop = Math.min(before + 400, maxScroll);
+            scrolled = container.scrollTop > before;
+            if (scrolled) {
+              return { 
+                scrolled: true, 
+                scrollTop: container.scrollTop, 
+                maxScroll,
+                pct: Math.round((container.scrollTop / maxScroll) * 100),
+                tag: container.tagName,
+                cls: container.className.substring(0, 60)
+              };
+            }
+          }
+        }
+        return { scrolled: false, candidateCount: candidates.length };
+      }, scrollAttempt);
+
+      // Wait for Kendo to render new rows
+      await new Promise(r => setTimeout(r, 500));
+
+      // Extract visible rows and merge
+      const visible = await extractVisibleRows();
+      for (const b of visible) allCollected.set(b.uid, b);
+
+      // Log progress every 10 scrolls
+      if ((scrollAttempt + 1) % 10 === 0 || !scrollResult.scrolled) {
+        console.log(`[YearScraper][${company.name}] Scroll ${scrollAttempt + 1}: collected ${allCollected.size}${totalExpected ? '/' + totalExpected : ''} | scroll: ${JSON.stringify(scrollResult)}`);
+      }
+
+      // If we can't scroll anymore, we're done
+      if (!scrollResult.scrolled) {
+        console.log(`[YearScraper][${company.name}] Can't scroll further, stopping.`);
+        break;
+      }
+
+      // Check if we've collected all expected
+      if (totalExpected > 0 && allCollected.size >= totalExpected) {
+        console.log(`[YearScraper][${company.name}] Reached expected total: ${allCollected.size}`);
+        break;
+      }
+
+      if (allCollected.size === lastCollectedSize) {
+        stableRounds++;
+        if (stableRounds >= 50) {
+          console.log(`[YearScraper][${company.name}] No new rows for 50 scrolls, stopping. Last scroll: ${JSON.stringify(scrollResult)}`);
+          break;
+        }
+      } else {
+        stableRounds = 0;
+      }
+      lastCollectedSize = allCollected.size;
+    }
+
+    const rawBookings = Array.from(allCollected.values());
+    console.log(`[YearScraper][${company.name}] Total collected: ${rawBookings.length}`);
+
+    // Log first 3 bookings' price values for debugging
+    const priceSamples = rawBookings.slice(0, 3).map(b => ({ code: b.code, priceRaw: b.priceRaw }));
+    console.log(`[YearScraper][${company.name}] Price samples:`, JSON.stringify(priceSamples));
+
+    // Helper: parse date string like "01.03.2026" or "2026-03-01" to "YYYY-MM-DD"
+    function parseDate(str) {
+      if (!str) return null;
+      const parts = str.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})/);
+      if (parts) {
+        const day = parts[1].padStart(2, '0');
+        const month = parts[2].padStart(2, '0');
+        const year = parts[3].length === 2 ? '20' + parts[3] : parts[3];
+        return `${year}-${month}-${day}`;
+      }
+      if (str.match(/^\d{4}-\d{2}-\d{2}/)) return str.substring(0, 10);
+      return null;
+    }
+
+    // Helper: parse price string like "120,99 €" or "0,00€" to float
+    function parsePrice(str) {
+      if (!str) return null;
+      const cleaned = str.replace(/[€\s]/g, '').replace(',', '.');
+      const val = parseFloat(cleaned);
+      return isNaN(val) ? null : val;
+    }
+
+    // Upsert into database — create TWO entries per booking:
+    let created = 0, updated = 0;
+    for (const b of rawBookings) {
+      const arrivalDate = parseDate(b.parkdatum);
+      const departureDate = parseDate(b.rueckgabe);
+      const price = parsePrice(b.priceRaw);
+
+      // 1) Annahme entry on arrival date
+      if (arrivalDate) {
+        const inData = {
+          ...b,
+          rueckgabeDatum: departureDate || b.rueckgabe,
+          rueckgabeZeit: b.rueckgabeZeit || null,
+          type: 'checkin',
+          price,
+        };
+        const r1 = upsertBookingFromScrape(inData, companyId, arrivalDate);
+        if (r1.action === 'created') created++; else updated++;
+      }
+
+      // 2) Rückgabe entry on departure date
+      if (departureDate && departureDate !== arrivalDate) {
+        const outData = {
+          ...b,
+          zeit: b.rueckgabeZeit || null,
+          rueckgabeDatum: departureDate,
+          rueckgabeZeit: b.rueckgabeZeit || null,
+          type: 'checkout',
+          price,
+        };
+        const r2 = upsertBookingFromScrape(outData, companyId, departureDate);
+        if (r2.action === 'created') created++; else updated++;
+      }
+    }
+
+    const duration = Date.now() - startTime;
+
+    // Log the scrape
+    d.prepare('INSERT INTO scrape_log (company_id, date, bookings_found, bookings_new, bookings_updated, duration_ms) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(companyId, 'YEAR-IMPORT', rawBookings.length, created, updated, duration);
+
+    console.log(`[YearScraper][${company.name}] Done! ${rawBookings.length} found, ${created} new, ${updated} updated (${duration}ms)`);
+
+    return {
+      company: company.name,
+      date: 'YEAR-IMPORT',
+      total: rawBookings.length,
+      created,
+      updated,
+      duration
+    };
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    d.prepare('INSERT INTO scrape_log (company_id, date, error, duration_ms) VALUES (?, ?, ?, ?)')
+      .run(companyId, 'YEAR-IMPORT', error.message, duration);
+    throw error;
+  } finally {
+    await page.close();
   }
-  const damage_number = nextDamageNumber();
-  const incident_date = new Date().toISOString().split('T')[0];
-  const result = d.prepare(`INSERT INTO damages (damage_number, first_name, last_name, plate, car_brand, car_color, incident_time, incident_date, description, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    damage_number, first_name, last_name, plate.toUpperCase(),
-    car_brand || null, car_color || null, incident_time || null, incident_date, description, req.user.id
-  );
-  res.json({ id: result.lastInsertRowid, damage_number, message: 'Schaden protokolliert' });
-});
+}
 
-// Update damage status
-router.put('/damages/:id', requireAuth, (req, res) => {
+// ─── Auto-scrape all companies ──────────────────────────────────────────
+
+async function autoScrapeAll() {
   const d = getDb();
-  const { status, description } = req.body;
-  const fields = []; const values = [];
-  if (status) { fields.push('status = ?'); values.push(status); }
-  if (description !== undefined) { fields.push('description = ?'); values.push(description); }
-  if (!fields.length) return res.status(400).json({ error: 'Keine Änderungen' });
-  fields.push("updated_at = datetime('now')");
-  values.push(parseInt(req.params.id));
-  d.prepare(`UPDATE damages SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  res.json({ message: 'Schaden aktualisiert' });
-});
-
-// Delete damage (admin only)
-router.delete('/damages/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const id = parseInt(req.params.id);
-  const damage = d.prepare('SELECT id FROM damages WHERE id = ?').get(id);
-  if (!damage) return res.status(404).json({ error: 'Schaden nicht gefunden' });
-  d.prepare('DELETE FROM damage_photos WHERE damage_id = ?').run(id);
-  d.prepare('DELETE FROM damages WHERE id = ?').run(id);
-  res.json({ message: 'Schaden gelöscht' });
-});
-
-// Upload photos to damage
-router.post('/damages/:id/photos', requireAuth, upload.array('photos', 10), (req, res) => {
-  const d = getDb();
-  const damageId = parseInt(req.params.id);
-  const damage = d.prepare('SELECT id FROM damages WHERE id = ?').get(damageId);
-  if (!damage) return res.status(404).json({ error: 'Schaden nicht gefunden' });
-
-  const label = req.body.label || 'other';
-  const photos = [];
-  for (const file of (req.files || [])) {
-    const result = d.prepare('INSERT INTO damage_photos (damage_id, filename, filepath, label, uploaded_by) VALUES (?, ?, ?, ?, ?)')
-      .run(damageId, file.originalname, `/uploads/${file.filename}`, label, req.user.id);
-    photos.push({ id: result.lastInsertRowid, filename: file.originalname, filepath: `/uploads/${file.filename}` });
+  const companies = d.prepare('SELECT id, name FROM companies WHERE active = 1').all();
+  for (const co of companies) {
+    try {
+      console.log(`[AutoScrape] ${co.name}...`);
+      await scrapeCompany(co.id);
+    } catch (err) {
+      console.error(`[AutoScrape] ${co.name} error:`, err.message);
+    }
   }
-  res.json({ message: `${photos.length} Foto(s) hochgeladen`, photos });
-});
+}
 
-// Serve uploaded photos
-router.get('/uploads/:filename', (req, res) => {
-  const filePath = path.join(UPLOAD_DIR, req.params.filename);
-  if (fs.existsSync(filePath)) res.sendFile(filePath);
-  else res.status(404).json({ error: 'Datei nicht gefunden' });
-});
+// ─── Cleanup ────────────────────────────────────────────────────────────
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  WORK LOCATIONS (Arbeitsorte)
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Get all work locations
-router.get('/work-locations', requireAuth, (req, res) => {
-  const d = getDb();
-  const locations = d.prepare('SELECT * FROM work_locations ORDER BY name ASC').all();
-  res.json(locations);
-});
-
-// Create work location (admin only)
-router.post('/work-locations', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { name, address, latitude, longitude, radius_m } = req.body;
-  if (!name || !latitude || !longitude) {
-    return res.status(400).json({ error: 'Name, Latitude und Longitude erforderlich' });
+async function closeBrowser() {
+  if (browserInstance) {
+    await browserInstance.close();
+    browserInstance = null;
   }
-  const result = d.prepare(`
-    INSERT INTO work_locations (name, address, latitude, longitude, radius_m)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(name, address || '', parseFloat(latitude), parseFloat(longitude), parseInt(radius_m) || 500);
-  res.json({ id: result.lastInsertRowid, message: 'Arbeitsort erstellt' });
-});
+}
 
-// Update work location (admin only)
-router.put('/work-locations/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  const { name, address, latitude, longitude, radius_m, active } = req.body;
-  d.prepare(`
-    UPDATE work_locations SET
-      name = COALESCE(?, name),
-      address = COALESCE(?, address),
-      latitude = COALESCE(?, latitude),
-      longitude = COALESCE(?, longitude),
-      radius_m = COALESCE(?, radius_m),
-      active = COALESCE(?, active)
-    WHERE id = ?
-  `).run(name, address, latitude, longitude, radius_m, active, parseInt(req.params.id));
-  res.json({ message: 'Arbeitsort aktualisiert' });
-});
-
-// Delete work location (admin only)
-router.delete('/work-locations/:id', requireAuth, requireAdmin, (req, res) => {
-  const d = getDb();
-  d.prepare('DELETE FROM work_locations WHERE id = ?').run(parseInt(req.params.id));
-  res.json({ message: 'Arbeitsort gelöscht' });
-});
-
-// ─── HEALTH ─────────────────────────────────────────────────────────────
-
-router.get('/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Park King OS', version: '1.0.0', time: new Date().toISOString() });
-});
-
-module.exports = router;
+module.exports = { scrapeCompany, scrapeYearView, autoScrapeAll, closeBrowser };
