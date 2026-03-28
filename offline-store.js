@@ -1,555 +1,181 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Park King">
-<meta name="theme-color" content="#000000">
-<title>Park King OS</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
-<script src="/offline-store.js"></script>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  :root{--bg:#f7f7f8;--surface:#fff;--surface2:#f0f0f2;--border:#e4e4e7;--text:#18181b;--text2:#71717a;--text3:#a1a1aa;--accent:#CC6CE7;--accent-light:rgba(204,108,231,0.08);--green:#22c55e;--green-bg:rgba(34,197,94,0.12);--red:#ef4444;--red-bg:rgba(239,68,68,0.12);--orange:#f59e0b;--orange-bg:rgba(245,158,11,0.12);--blue:#3b82f6;--blue-bg:rgba(59,130,246,0.08);--r:12px;--shadow:0 1px 3px rgba(0,0,0,0.06)}
-  html,body{height:100%}
-  body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
-  .login-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#f8f0fc 0%,#f7f7f8 50%,#f0e8fc 100%)}
-  .login-box{width:100%;max-width:380px;background:var(--surface);border-radius:20px;padding:36px 28px;box-shadow:0 8px 40px rgba(204,108,231,0.1)}
-  .login-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;justify-content:center}
-  .login-logo-icon{width:48px;height:48px;background:var(--accent);border-radius:14px;display:grid;place-items:center;font-size:22px;font-weight:800;color:#fff;font-family:'JetBrains Mono',monospace}
-  .login-logo h1{font-size:20px;font-weight:700} .login-logo h1 span{color:var(--text3);display:block;font-size:12px;font-weight:500}
-  .form-label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px}
-  .form-input{width:100%;padding:13px 16px;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;outline:none;transition:border-color .2s}
-  .form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
-  .form-input::placeholder{color:var(--text3)}
-  .form-group{margin-bottom:16px}
-  .btn{padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;transition:transform .12s,opacity .12s}
-  .btn:active{transform:scale(.97);opacity:.9}
-  .btn-full{width:100%}
-  .btn-accent{background:var(--accent);color:#fff;box-shadow:0 2px 12px rgba(204,108,231,0.3)}
-  .btn-outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
-  .btn-white{background:var(--surface);color:var(--text);border:1.5px solid var(--border)}
-  .btn-ghost{background:transparent;color:var(--text2);font-weight:500;font-size:14px;border:none}
-  .btn-sm{padding:10px 16px;font-size:13px}
-  .btn-xs{padding:7px 12px;font-size:12px}
-  .error-msg{color:var(--red);font-size:13px;margin-top:8px;text-align:center}
-  .app{display:none;min-height:100dvh;flex-direction:column}.app.active{display:flex}
-  .header{padding:12px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:100;box-shadow:var(--shadow)}
-  .header-icon{width:36px;height:36px;background:var(--accent);border-radius:8px;display:grid;place-items:center;font-size:16px;color:#fff;font-weight:800;font-family:'JetBrains Mono',monospace}
-  .header-text{flex:1;min-width:0}
-  .header-greeting{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .header-sub{font-size:10px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px}
-  .header-right{display:flex;gap:6px}
-  .header-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;transition:all .2s}
-  .header-btn:active{border-color:var(--accent);color:var(--accent)}
-  .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100;box-shadow:0 -2px 10px rgba(0,0,0,0.04);padding-bottom:env(safe-area-inset-bottom,0)}
-  .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px 8px;cursor:pointer;color:var(--text3);font-size:10px;font-weight:600;transition:color .2s;border:none;background:none}
-  .nav-item.active{color:var(--accent)}
-  .nav-icon{font-size:20px;line-height:1}
-  .nav-item.admin-only{display:none}
-  body.is-admin .nav-item.admin-only{display:flex}
-  .tab-page{display:none;flex:1;padding:16px 20px;max-width:600px;margin:0 auto;width:100%;padding-bottom:80px}
-  .tab-page.active{display:block}
-  .company-select{display:flex;gap:8px;margin-bottom:16px}
-  .company-btn{flex:1;padding:12px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s;box-shadow:var(--shadow)}
-  .company-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
-  .date-nav{display:flex;align-items:center;gap:8px;margin-bottom:16px}
-  .date-nav-today{padding:8px 14px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow)}
-  .date-nav-today:active{background:var(--accent-light);color:var(--accent);border-color:var(--accent)}
-  .date-nav-picker{flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;outline:none;box-shadow:var(--shadow);text-align:center}
-  .date-nav-picker:focus{border-color:var(--accent)}
-  .date-nav-arrow{width:40px;height:40px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text2);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);line-height:1}
-  .date-nav-arrow:active{background:var(--accent-light);color:var(--accent);border-color:var(--accent)}
-  .search-row{display:flex;gap:8px;margin-bottom:10px}
-  .search-row .search-bar{flex:1;margin-bottom:0}
-  .search-bar{position:relative}
-  .search-bar input{width:100%;padding:10px 14px 10px 36px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-size:14px;outline:none;box-shadow:var(--shadow)}
-  .search-bar input:focus{border-color:var(--accent)}
-  .search-bar input::placeholder{color:var(--text3)}
-  .search-bar .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none}
-  .btn-print-all{width:44px;height:44px;border:1.5px solid var(--green);border-radius:var(--r);background:var(--green-bg);color:var(--green);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);flex-shrink:0}
-  .btn-print-all:active{background:var(--green);color:#fff}
-  .filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
-  .filter-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text2);user-select:none}
-  .filter-toggle input{display:none}
-  .filter-toggle-slider{width:36px;height:20px;background:var(--border);border-radius:10px;position:relative;transition:background .2s}
-  .filter-toggle-slider::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
-  .filter-toggle input:checked + .filter-toggle-slider{background:var(--accent)}
-  .filter-toggle input:checked + .filter-toggle-slider::after{transform:translateX(16px)}
-  .filter-toggle-label{font-weight:500}
-  .status-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-  .status-chip{padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600}
-  .chip-green{background:var(--green-bg);color:var(--green)}
-  .chip-blue{background:var(--blue-bg);color:var(--blue)}
-  .chip-company{background:var(--accent-light);color:var(--accent)}
-  .booking-list{display:flex;flex-direction:column;gap:2px}
-  .bcard{overflow:hidden;transition:all .15s;animation:fadeUp .2s ease forwards;opacity:0;border-left:none}
-  .bcard.type-in{background:rgba(34,197,94,.08);border-bottom:1px solid rgba(34,197,94,.15)}
-  .bcard.type-out{background:rgba(239,68,68,.08);border-bottom:1px solid rgba(239,68,68,.15)}
-  .bcard.type-in.checked{background:rgba(34,197,94,.18)}
-  .bcard-row{display:flex;cursor:pointer;padding:8px 10px;gap:8px;align-items:flex-start}.bcard-row:active{opacity:.7}
-  .bcard-time{width:52px;flex-shrink:0;text-align:center;padding-top:2px}
-  .bcard-time .bt-icon{font-size:11px;color:var(--text3)}
-  .bcard-time .bt-time{font-size:14px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace}
-  .bcard-time .bt-flight{font-size:10px;font-weight:600;color:var(--blue);margin-top:1px}
-  .bcard-time .bt-checked{color:var(--green);font-size:14px}
-  .bcard-body{flex:1;min-width:0}
-  .bcard-top{display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap}
-  .bcard-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid;white-space:nowrap}
-  .bcard-badge.pk{color:var(--accent);border-color:var(--accent);background:var(--accent-light)}
-  .bcard-badge.provider{color:var(--blue);border-color:var(--blue);background:var(--blue-bg)}
-  .bcard-plate{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--text);display:inline}
-  .bcard-code{font-size:11px;color:var(--text3);font-weight:400;margin-left:6px}
-  .bcard-name{font-size:12px;color:var(--text2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .bcard-meta{font-size:11px;color:var(--text3);margin-top:1px}
-  .bcard-right{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:2px;padding-top:2px}
-  .bcard-pax{font-size:12px;font-weight:700;color:var(--accent)}
-  .bcard-price{font-size:10px;font-weight:600;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:1px 5px}
-  .bcard-printed{font-size:9px;font-weight:600;color:var(--green);background:var(--green-bg);padding:1px 5px;border-radius:3px}
-  .bcard-editor{display:none;padding:14px;border-top:1px solid var(--border);background:var(--surface2)}
-  .bcard-editor.open{display:block}
-  .ed-row{display:flex;gap:8px;margin-bottom:8px}.ed-row .ed-col{flex:1}
-  .ed-label{font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:3px}
-  .ed-input{width:100%;padding:10px 12px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);outline:none;font-family:'Outfit',sans-serif}
-  .ed-input:focus{border-color:var(--accent)}
-  .ed-input.plate{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:1px}
-  .label-preview{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;justify-content:center;margin:10px 0}
-  .label-preview canvas{display:block}
-  .ed-btns{display:flex;gap:8px;flex-wrap:wrap}
+// ═══════════════════════════════════════════════════════════════════════════
+//  Park King OS — Service Worker (PWA + Offline)
+//  Network-first für App-Dateien, Cache nur als Fallback offline
+// ═══════════════════════════════════════════════════════════════════════════
 
-  /* Booking Detail View */
-  .booking-detail-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg);overflow-y:auto;display:none;animation:fadeUp .25s ease}
-  .booking-detail-overlay.open{display:block}
-  .bd-header{display:flex;align-items:center;justify-content:space-between;padding:16px;position:sticky;top:0;background:var(--bg);z-index:1;border-bottom:1px solid var(--border)}
-  .bd-back{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .bd-title{font-size:15px;font-weight:700;color:var(--text)}
-  .bd-actions{display:flex;gap:8px}
-  .bd-action-btn{width:40px;height:40px;border-radius:50%;background:var(--surface);border:1.5px solid var(--border);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)}
-  .bd-section{margin:0 16px 16px;background:var(--surface);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
-  .bd-ext-id{text-align:center;background:var(--surface2);padding:8px;font-size:12px;color:var(--text3);font-weight:600;margin:0 16px 16px;border-radius:8px}
-  .bd-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .bd-info-label{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
-  .bd-info-value{font-size:14px;font-weight:600;color:var(--text)}
-  .bd-dates{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 16px 16px;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
-  .bd-date-col{padding:16px}
-  .bd-date-col.arrival{background:var(--green)}
-  .bd-date-col.departure{background:var(--red)}
-  .bd-date-col .bd-date-header{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.85);margin-bottom:10px}
-  .bd-date-col .bd-date-val{font-size:14px;font-weight:700;color:#fff;margin-bottom:2px}
-  .bd-date-col .bd-date-time{font-size:22px;font-weight:800;color:#fff}
-  .bd-check-btn{width:100%;padding:10px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px}
-  .bd-check-btn.checkin{background:rgba(255,255,255,.25);color:#fff}
-  .bd-check-btn.checkin.done{background:rgba(255,255,255,.4);color:#fff}
-  .bd-check-btn.checkout{background:rgba(255,255,255,.25);color:#fff}
-  .bd-checked-info{margin-top:10px;padding:8px;background:rgba(255,255,255,.15);border-radius:6px}
-  .bd-undo-btn{width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.8);font-size:11px;font-weight:600;cursor:pointer;margin-top:6px;transition:all .2s}
-  .bd-undo-btn:hover{background:rgba(255,255,255,.15)}
-  .bd-status-section{margin:0 16px 16px;background:var(--surface);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
-  .bd-status-header{font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text)}
-  .bd-status-all-btns{display:flex;flex-direction:column;gap:8px}
-  .bd-status-btn{padding:12px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;text-align:left}
-  .bd-status-btn:hover{border-color:var(--accent);background:var(--accent-light)}
-  .bd-status-btn.urgent{border-color:var(--red)}
-  .bd-status-btn.urgent:hover{background:rgba(239,68,68,.1)}
-  .bd-status-active-row{display:flex;flex-direction:column;gap:10px;align-items:stretch}
-  .bd-status-active{padding:14px 16px;border-radius:10px;font-size:14px;font-weight:700;text-align:center}
-  .bd-status-active.angerufen_unterwegs{background:var(--blue-bg);color:var(--blue)}
-  .bd-status-active.wartet_parkplatz{background:var(--green-bg);color:var(--green)}
-  .bd-status-active.gelandet_gepaeck{background:var(--orange-bg);color:var(--orange)}
-  .bd-status-active.terminal2_sofort{background:rgba(239,68,68,.15);color:var(--red)}
-  .bd-status-clear-btn{padding:10px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
-  .bd-status-clear-btn:hover{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.05)}
-  .bcard-status-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px}
-  .bd-log-section{margin:0 16px 16px;background:var(--surface);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
-  .bd-log-header{font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text)}
-  .bd-log-list{display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto}
-  .bd-log-item{padding:10px 12px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent)}
-  .bd-log-action{font-size:13px;font-weight:600;color:var(--text)}
-  .bd-log-meta{font-size:11px;color:var(--text3);margin-top:2px}
-  .bd-log-empty,.bd-log-loading{font-size:12px;color:var(--text3);text-align:center;padding:16px}
-  .bd-flight-row{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 16px 16px;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
-  .bd-flight-col{padding:14px;display:flex;align-items:center;gap:8px}
-  .bd-flight-col.dep{background:var(--green);color:#fff}
-  .bd-flight-col.arr{background:var(--red);color:#fff}
-  .bd-flight-col .bd-flight-icon{font-size:18px}
-  .bd-flight-col .bd-flight-code{font-size:16px;font-weight:800}
-  .bd-call-btn{width:100%;padding:12px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
-  .bd-call-btn.dep{background:rgba(255,255,255,.2);color:#fff}
-  .bd-call-btn.arr{background:rgba(255,255,255,.2);color:#fff}
-  .bd-bottom-btn{margin:0 16px 16px;padding:16px;border-radius:var(--r);background:var(--accent);color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;width:calc(100% - 32px);display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--shadow)}
-  .bd-cost{margin:0 16px 24px;background:var(--surface);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);border:1px solid var(--border)}
-  .tasks-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-  .tasks-date{font-size:14px;font-weight:600;color:var(--text2)}
-  .tasks-progress{display:flex;align-items:center;gap:10px;margin-bottom:20px}
-  .progress-bar{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}
-  .progress-fill{height:100%;background:var(--green);border-radius:4px;transition:width .4s ease}
-  .progress-text{font-size:13px;font-weight:700;color:var(--text2);min-width:50px;text-align:right}
-  .task-list{display:flex;flex-direction:column;gap:8px}
-  .task-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s;box-shadow:var(--shadow);animation:fadeUp .3s ease forwards;opacity:0}
-  .task-card:active{transform:scale(.98)}
-  .task-card.done{border-color:var(--green);background:var(--green-bg)}
-  .task-check{width:28px;height:28px;border-radius:8px;border:2px solid var(--border);display:grid;place-items:center;flex-shrink:0;transition:all .2s;font-size:16px;color:transparent}
-  .task-card.done .task-check{background:var(--green);border-color:var(--green);color:#fff}
-  .task-info{flex:1;min-width:0}
-  .task-title{font-size:15px;font-weight:600;color:var(--text)}
-  .task-card.done .task-title{text-decoration:line-through;color:var(--text3)}
-  .task-desc{font-size:12px;color:var(--text3);margin-top:2px}
-  .task-meta{font-size:11px;color:var(--green);font-weight:600;margin-top:4px}
-  .task-empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:14px}
-  .admin-section{margin-bottom:24px}
-  .admin-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-  .admin-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:8px;box-shadow:var(--shadow)}
-  .admin-card-row{display:flex;align-items:center;gap:12px}
-  .admin-avatar{width:36px;height:36px;border-radius:10px;background:var(--accent-light);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0}
-  .admin-card-info{flex:1;min-width:0}
-  .admin-card-name{font-size:14px;font-weight:600}
-  .admin-card-sub{font-size:12px;color:var(--text3)}
-  .role-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px}
-  .role-admin{background:var(--accent-light);color:var(--accent)}
-  .role-staff{background:var(--blue-bg);color:var(--blue)}
-  .role-inactive{background:var(--surface2);color:var(--text3)}
-  .admin-actions{display:flex;gap:6px;margin-top:8px}
+const CACHE_NAME = 'parkking-v12';
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/app.js',
+  '/offline-store.js',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/icon.svg'
+];
 
-  /* ─── SCHEDULE TAB ─── */
-  .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-  .week-nav-btn{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;font-weight:700;color:var(--text2)}
-  .week-nav-btn:active{border-color:var(--accent);color:var(--accent)}
-  .week-label{font-size:14px;font-weight:700;text-align:center}
-  .week-label span{display:block;font-size:11px;font-weight:500;color:var(--text3)}
-  .my-shift-box{background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
-  .my-shift-header{font-size:15px;font-weight:700;margin-bottom:10px;color:var(--accent)}
-  .my-shift-info{font-size:14px;color:var(--text);margin-bottom:12px}
-  .my-shift-time{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;color:var(--text)}
-  .my-shift-status{font-size:12px;color:var(--text3);margin-top:4px}
-  .my-shift-actions{display:flex;gap:10px}
-  .shift-checkin-btn{flex:1;padding:14px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
-  .shift-checkin-btn.start{background:var(--green);color:#fff}
-  .shift-checkin-btn.end{background:var(--red);color:#fff}
-  .shift-checkin-btn:disabled{opacity:0.5;cursor:not-allowed}
-  .shift-checked-in{background:var(--green-bg);color:var(--green);padding:12px;border-radius:8px;font-size:13px;font-weight:600;text-align:center}
-  .shift-late-warning{background:#dc2626;color:#fff;padding:16px;border-radius:12px;margin-bottom:12px;text-align:center;animation:pulse-danger 1s infinite}
-  .shift-late-warning .warning-title{font-size:16px;font-weight:800;margin-bottom:6px}
-  .shift-late-warning .warning-quote{font-size:12px;font-style:italic;opacity:0.9;margin-top:8px}
-  @keyframes pulse-danger{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0.4)}50%{box-shadow:0 0 0 10px rgba(220,38,38,0)}}
-  .schedule-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
-  .day-row{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
-  .day-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;font-weight:600;font-size:14px}
-  .day-header.today{background:var(--accent-light);color:var(--accent)}
-  .day-header .day-name{font-weight:700}
-  .day-header .day-date{font-size:12px;color:var(--text3);font-weight:500}
-  .day-header.today .day-date{color:var(--accent)}
-  .day-shifts{padding:0 14px 10px;display:flex;flex-direction:column;gap:6px}
-  .shift-pill{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:13px;position:relative}
-  .shift-pill .shift-time{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;min-width:95px}
-  .shift-pill .shift-user{font-weight:600;flex:1}
-  .shift-pill .shift-hours{font-size:11px;font-weight:700;opacity:0.7}
-  .shift-pill .shift-del{background:none;border:none;font-size:14px;cursor:pointer;padding:2px 6px;border-radius:4px;color:inherit;opacity:0.5}
-  .shift-pill .shift-del:hover{opacity:1;background:rgba(0,0,0,0.1)}
-  .day-empty{font-size:12px;color:var(--text3);padding:4px 0;font-style:italic}
-  .day-add{background:none;border:1.5px dashed var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text3);cursor:pointer;text-align:center;font-weight:600;width:100%}
-  .day-add:hover{border-color:var(--accent);color:var(--accent)}
-  .hours-summary{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
-  .hours-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:10px}
-  .hours-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
-  .hours-row:last-child{border-bottom:none}
-  .hours-user{font-size:14px;font-weight:600}
-  .hours-val{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:14px;color:var(--accent)}
+const FONT_CACHE = 'parkking-fonts-v1';
 
-  /* ─── DAMAGES TAB ─── */
-  .dmg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-  .dmg-search{position:relative;margin-bottom:16px}
-  .dmg-search input{width:100%;padding:12px 16px 12px 42px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);font-size:15px;outline:none;color:var(--text)}
-  .dmg-search input:focus{border-color:var(--accent)}
-  .dmg-search .si{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;pointer-events:none}
-  .dmg-list{display:flex;flex-direction:column;gap:10px}
-  .dmg-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);cursor:pointer;transition:all .2s;animation:fadeUp .3s ease forwards;opacity:0}
-  .dmg-card:active{transform:scale(.98)}
-  .dmg-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-  .dmg-number{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:14px;color:var(--red)}
-  .dmg-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px}
-  .dmg-status.open{background:var(--red-bg);color:var(--red)}
-  .dmg-status.in_progress{background:var(--orange-bg);color:var(--orange)}
-  .dmg-status.closed{background:var(--green-bg);color:var(--green)}
-  .dmg-card-plate{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:800;margin-bottom:2px}
-  .dmg-card-name{font-size:13px;color:var(--text2)}
-  .dmg-card-meta{font-size:11px;color:var(--text3);margin-top:4px;display:flex;gap:12px}
-  .dmg-detail{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
-  .dmg-detail-title{font-size:16px;font-weight:700;margin-bottom:4px}
-  .dmg-detail-field{font-size:13px;color:var(--text2);margin-bottom:3px}
-  .dmg-detail-field strong{color:var(--text)}
-  .dmg-detail-desc{background:var(--surface2);padding:12px;border-radius:8px;font-size:14px;margin-top:8px;line-height:1.5}
-  .dmg-photos{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
-  .dmg-photo{border-radius:8px;overflow:hidden;border:1.5px solid var(--border);position:relative;aspect-ratio:4/3}
-  .dmg-photo img{width:100%;height:100%;object-fit:cover;display:block}
-  .dmg-photo-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:3px 6px;text-align:center}
-  .dmg-upload-area{border:2px dashed var(--border);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-top:12px}
-  .dmg-upload-area:hover,.dmg-upload-area.dragover{border-color:var(--accent);background:var(--accent-light)}
-  .dmg-upload-area input{display:none}
-  .dmg-upload-text{font-size:13px;color:var(--text3);font-weight:500}
-  .dmg-upload-text span{color:var(--accent);font-weight:700}
+// ─── Install: cache app shell, skip waiting sofort ────────────────────────
+self.addEventListener('install', (event) => {
+  console.log('[SW] Installing v7...');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
+});
 
-  /* ─── DAMAGES TAB ─── */
-  .dmg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px}
-  .dmg-list{display:flex;flex-direction:column;gap:10px}
-  .dmg-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);animation:fadeUp .3s ease forwards;opacity:0;cursor:pointer}
-  .dmg-card:active{transform:scale(.99)}
-  .dmg-card-top{display:flex;align-items:center;gap:12px;padding:14px}
-  .dmg-icon{width:40px;height:40px;border-radius:10px;background:var(--red-bg);color:var(--red);display:grid;place-items:center;font-size:18px;flex-shrink:0}
-  .dmg-card-info{flex:1;min-width:0}
-  .dmg-card-title{font-size:15px;font-weight:700}
-  .dmg-card-sub{font-size:12px;color:var(--text3);margin-top:2px}
-  .dmg-number{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--red-bg);color:var(--red)}
-  .dmg-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px}
-  .dmg-status.open{background:var(--red-bg);color:var(--red)}
-  .dmg-status.in_progress{background:var(--orange-bg);color:var(--orange)}
-  .dmg-status.closed{background:var(--green-bg);color:var(--green)}
-  .dmg-photos-strip{display:flex;gap:6px;padding:0 14px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .dmg-photos-strip::-webkit-scrollbar{display:none}
-  .dmg-thumb{width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;cursor:pointer}
-  .dmg-detail-section{margin-bottom:12px}
-  .dmg-detail-label{font-size:10px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
-  .dmg-detail-text{font-size:14px;color:var(--text)}
-  .dmg-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .dmg-photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-  .dmg-photo-large{width:calc(50% - 4px);aspect-ratio:4/3;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer}
-  .dmg-upload-area{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;color:var(--text3);font-size:13px;font-weight:600;transition:all .2s;margin-top:8px}
-  .dmg-upload-area:hover{border-color:var(--accent);color:var(--accent)}
-  .dmg-upload-area input{display:none}
-  .photo-preview-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-  .photo-preview-item{width:60px;height:60px;border-radius:8px;object-fit:cover;border:1.5px solid var(--accent)}
-  .lightbox{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;cursor:pointer}
-  .lightbox.open{display:flex}
-  .lightbox img{max-width:100%;max-height:90vh;border-radius:8px;object-fit:contain}
-  .lightbox-info{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;font-size:12px;background:rgba(0,0,0,0.6);padding:6px 14px;border-radius:8px;white-space:nowrap}
+// ─── Activate: clean old caches, claim clients sofort ─────────────────────
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating v7...');
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(k => k !== CACHE_NAME && k !== FONT_CACHE)
+          .map(k => { console.log('[SW] Deleting old cache:', k); return caches.delete(k); })
+      )
+    ).then(() => self.clients.claim())
+     .then(() => {
+       // Alle offenen Tabs neu laden
+       self.clients.matchAll({ type: 'window' }).then(clients => {
+         clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
+       });
+     })
+  );
+});
 
-  /* ─── OFFLINE STATUS ─── */
-  .offline-bar{position:fixed;top:0;left:0;right:0;z-index:300;padding:6px 16px;font-size:12px;font-weight:700;text-align:center;transition:transform .3s,opacity .3s;transform:translateY(-100%);opacity:0}
-  .offline-bar.show{transform:translateY(0);opacity:1}
-  .offline-bar.offline{background:#ef4444;color:#fff}
-  .offline-bar.syncing{background:#f59e0b;color:#fff}
-  .offline-bar.synced{background:#22c55e;color:#fff}
-  .offline-bar + .header{transition:margin-top .3s}
-  .offline-bar.show + .header{margin-top:30px}
-  .sync-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;position:absolute;top:-4px;right:-4px}
-  .header-btn{position:relative}
-  .offline-indicator{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
-  .offline-indicator.online{background:#22c55e}
-  .offline-indicator.offline{background:#ef4444;animation:pulse-dot 1.5s infinite}
-  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.4}}
+// ─── Fetch: network-first for API, cache-first for assets ───────────────
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
 
-  /* ─── MISC ─── */
-  .loading{display:flex;flex-direction:column;align-items:center;padding:60px 20px;gap:16px}
-  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .loading-text{color:var(--text2);font-size:14px}
-  .empty{text-align:center;padding:48px 20px;color:var(--text2);font-size:14px}
-  .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1.5px solid var(--accent);color:var(--accent);padding:12px 24px;border-radius:50px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:1000;pointer-events:none;white-space:nowrap;box-shadow:0 8px 30px rgba(204,108,231,0.2)}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-  .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:flex-end;justify-content:center}
-  .modal-overlay.open{display:flex}
-  .modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:24px 20px 40px;max-height:80dvh;overflow-y:auto;animation:slideUp .3s ease}
-  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-  .modal-title{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
-  .modal-close{background:var(--surface2);border:none;width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;display:grid;place-items:center;color:var(--text2)}
-</style>
-</head>
-<body>
+  // Skip non-GET cross-origin (except Google Fonts)
+  if (url.origin !== self.location.origin) {
+    // Cache Google Fonts
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+      event.respondWith(
+        caches.open(FONT_CACHE).then(cache =>
+          cache.match(event.request).then(cached => {
+            if (cached) return cached;
+            return fetch(event.request).then(response => {
+              if (response.ok) cache.put(event.request, response.clone());
+              return response;
+            }).catch(() => cached || new Response('', { status: 503 }));
+          })
+        )
+      );
+      return;
+    }
+    return;
+  }
 
-<div class="login-screen" id="loginScreen">
-  <div class="login-box">
-    <div class="login-logo"><div class="login-logo-icon">P</div><h1>Park King OS<span>v1</span></h1></div>
-    <div class="form-group"><label class="form-label">Benutzername</label><input type="text" id="loginUser" class="form-input" placeholder="Benutzername" autocomplete="username" autofocus></div>
-    <div class="form-group"><label class="form-label">Passwort</label><input type="password" id="loginPass" class="form-input" placeholder="Passwort" autocomplete="current-password"></div>
-    <button class="btn btn-accent btn-full" onclick="doLogin()">EINLOGGEN</button>
-    <div id="loginError" class="error-msg" style="display:none"></div>
-  </div>
-</div>
+  // ── API requests: network-first, fall through to IndexedDB in the client ──
+  if (url.pathname.startsWith('/api/')) {
+    // For GET requests: try network, return offline marker if fails
+    if (event.request.method === 'GET') {
+      event.respondWith(
+        fetch(event.request)
+          .then(response => {
+            // Clone and notify client of fresh data for caching
+            const clone = response.clone();
+            if (response.ok) {
+              notifyClients({
+                type: 'API_RESPONSE_CACHE',
+                url: url.pathname + url.search,
+                // Client will read from its own fetch
+              });
+            }
+            return response;
+          })
+          .catch(() => {
+            // Return offline marker — client will serve from IndexedDB
+            return new Response(
+              JSON.stringify({ _offline: true, _url: url.pathname + url.search }),
+              { status: 200, headers: { 'Content-Type': 'application/json', 'X-Offline': 'true' } }
+            );
+          })
+      );
+      return;
+    }
 
-<div class="app" id="app">
-  <div class="offline-bar" id="offlineBar">📴 Offline-Modus — Änderungen werden beim Verbinden synchronisiert</div>
-  <div class="header">
-    <div class="header-icon">P</div>
-    <div class="header-text">
-      <div class="header-greeting" id="headerGreeting">Hallo!</div>
-      <div class="header-sub">Park King OS <span class="offline-indicator online" id="connDot"></span></div>
-    </div>
-    <div class="header-right">
-      <button class="header-btn" id="syncBtn" onclick="manualSync()" title="Synchronisieren" style="display:none">⟳ <span id="syncCount"></span></button>
-      <button class="header-btn" onclick="location.reload(true)" title="App neu laden">↻</button>
-      <button class="header-btn" onclick="doLogout()">Logout</button>
-    </div>
-  </div>
+    // For POST/PUT/DELETE: try network, queue if offline
+    if (['POST', 'PUT', 'DELETE'].includes(event.request.method)) {
+      event.respondWith(
+        event.request.clone().text().then(body => {
+          return fetch(event.request)
+            .catch(() => {
+              // Network failed — notify client to queue this action
+              const actionData = {
+                type: 'QUEUE_OFFLINE_ACTION',
+                method: event.request.method,
+                url: url.pathname,
+                body: body,
+                headers: Object.fromEntries(event.request.headers.entries()),
+                timestamp: Date.now()
+              };
+              notifyClients(actionData);
+              return new Response(
+                JSON.stringify({ _offline: true, _queued: true, message: 'Offline gespeichert — wird synchronisiert' }),
+                { status: 200, headers: { 'Content-Type': 'application/json', 'X-Offline': 'true' } }
+              );
+            });
+        })
+      );
+      return;
+    }
+    return;
+  }
 
-  <!-- TAB: Buchungen -->
-  <div class="tab-page active" id="tabBookings">
-    <div class="company-select">
-      <button class="company-btn active" id="btn-parkking" onclick="selectCompany('parkking')">🅿️ Biemann</button>
-      <button class="company-btn" id="btn-psfmsf" onclick="selectCompany('psfmsf')">✈️ Hasloh</button>
-    </div>
-    <div class="date-nav">
-      <button class="date-nav-today" onclick="goToday()">Heute</button>
-      <input type="date" class="date-nav-picker" id="bookingDatePicker" onchange="goToDate(this.value)">
-      <button class="date-nav-arrow" onclick="goDateOffset(-1)">‹</button>
-      <button class="date-nav-arrow" onclick="goDateOffset(1)">›</button>
-    </div>
-    <div class="search-row">
-      <div class="search-bar"><span class="si">🔍</span><input type="text" id="searchInput" placeholder="Suchen..." oninput="handleSearch()"></div>
-      <button class="btn-print-all" onclick="printAllLabels()" title="Alle Annahmen drucken">🏷️</button>
-    </div>
-    <div class="filter-bar">
-      <label class="filter-toggle">
-        <input type="checkbox" id="hideCheckedFilter" onchange="filterBookings()" checked>
-        <span class="filter-toggle-slider"></span>
-        <span class="filter-toggle-label">Erledigte ausblenden</span>
-      </label>
-    </div>
-    <div class="status-bar" id="statusBar"></div>
-    <div id="loadingState" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Buchungen werden geladen...</div></div>
-    <div id="errorState" class="empty" style="display:none"></div>
-    <div id="bookingList" class="booking-list"></div>
-  </div>
+  // ── App shell: NETWORK-FIRST (immer aktuelle Version holen) ──
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        // Aktualisiere Cache mit neuer Version
+        if (response.ok && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        // Offline: aus Cache laden
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          // Fallback für navigation requests
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return new Response('Offline', { status: 503 });
+        });
+      })
+  );
+});
 
-  <!-- TAB: Aufgaben -->
-  <div class="tab-page" id="tabTasks">
-    <div class="tasks-header">
-      <div style="font-size:18px;font-weight:700">📋 Tagesaufgaben</div>
-      <div class="tasks-date" id="tasksDate"></div>
-    </div>
-    <div class="tasks-progress" id="tasksProgress" style="display:none">
-      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-      <div class="progress-text" id="progressText"></div>
-    </div>
-    <div id="taskLoading" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Aufgaben werden geladen...</div></div>
-    <div id="taskList" class="task-list"></div>
-  </div>
+// ─── Message handler for sync triggers ──────────────────────────────────
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
-  <!-- TAB: Dienstplan -->
-  <div class="tab-page" id="tabSchedule">
-    <!-- Mein Dienst Heute -->
-    <div id="myShiftToday" class="my-shift-box" style="display:none">
-      <div class="my-shift-header">🕐 Mein Dienst heute</div>
-      <div class="my-shift-info" id="myShiftInfo"></div>
-      <div class="my-shift-actions" id="myShiftActions"></div>
-    </div>
-    
-    <div class="week-nav">
-      <button class="week-nav-btn" onclick="changeWeek(-1)">◂ Vor</button>
-      <div class="week-label" id="weekLabel">KW 13<span>24.03. – 30.03.2026</span></div>
-      <button class="week-nav-btn" onclick="changeWeek(1)">Weiter ▸</button>
-    </div>
-    <div id="scheduleLoading" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Dienstplan wird geladen...</div></div>
-    <div id="scheduleGrid" class="schedule-grid"></div>
-    <div class="hours-summary" id="hoursSummary" style="display:none">
-      <div class="hours-title">⏱ Stunden diese Woche</div>
-      <div id="hoursRows"></div>
-    </div>
-  </div>
+// ─── Background Sync ────────────────────────────────────────────────────
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'parkking-sync') {
+    event.waitUntil(notifyClients({ type: 'TRIGGER_SYNC' }));
+  }
+});
 
-  <!-- TAB: Admin -->
-  <div class="tab-page" id="tabAdmin">
-    <div style="font-size:18px;font-weight:700;margin-bottom:20px">⚙️ Administration</div>
-    <div class="admin-section">
-      <div class="admin-section-title">📍 Arbeitsorte (GPS Check-in)</div>
-      <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Mitarbeiter können nur an diesen Orten einchecken. Radius in Metern.</div>
-      <div id="workLocationsList"></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addWorkLocation')">+ Neuer Arbeitsort</button>
-    </div>
-    <div class="admin-section">
-      <div class="admin-section-title">👤 Benutzer</div>
-      <div id="userList"></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addUser')">+ Neuer Benutzer</button>
-    </div>
-    <div class="admin-section">
-      <div class="admin-section-title">📋 Aufgaben verwalten</div>
-      <div id="adminTaskList"></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addTask')">+ Neue Aufgabe</button>
-    </div>
-    <div class="admin-section">
-      <div class="admin-section-title">🕐 Schichtvorlagen</div>
-      <div id="adminTemplateList"></div>
-      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="openModal('addTemplate')">+ Neue Vorlage</button>
-    </div>
-    <div class="admin-section">
-      <div class="admin-section-title">📊 Monatsstunden</div>
-      <div id="monthlyHours"></div>
-    </div>
-    <div class="admin-section">
-      <div class="admin-section-title">🔄 Tägliches Scraping (manuell)</div>
-      <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Holt die Buchungen für heute aus der Tagesansicht von ParkingPro. Läuft normalerweise automatisch.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-accent btn-sm" id="dailyScrapePK" onclick="dailyScrape('parkking')">🅿️ Biemann scrapen</button>
-        <button class="btn btn-accent btn-sm" id="dailyScrapePSF" onclick="dailyScrape('psfmsf')">✈️ Hasloh scrapen</button>
-      </div>
-      <div id="dailyScrapeStatus" style="font-size:13px;margin-top:8px;color:var(--text3)"></div>
-    </div>
-    <div class="admin-section">
-      <div class="admin-section-title">📥 Jahres-Import (einmalig)</div>
-      <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Importiert ALLE Buchungen aus der Jahresansicht von ParkingPro. Nur einmal nötig, danach übernimmt das tägliche Scraping.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" id="yearScrapePK" onclick="yearScrape('parkking')">🅿️ Biemann importieren</button>
-        <button class="btn btn-outline btn-sm" id="yearScrapePSF" onclick="yearScrape('psfmsf')">✈️ Hasloh importieren</button>
-      </div>
-      <div id="yearScrapeStatus" style="font-size:13px;margin-top:8px;color:var(--text3)"></div>
-    </div>
-  </div>
+// ─── Periodic Sync (if available) ───────────────────────────────────────
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'parkking-refresh') {
+    event.waitUntil(notifyClients({ type: 'TRIGGER_SYNC' }));
+  }
+});
 
-  <!-- TAB: Schäden -->
-  <div class="tab-page" id="tabDamages">
-    <div class="dmg-top">
-      <div style="font-size:18px;font-weight:700">🚨 Schadensprotokoll</div>
-      <button class="btn btn-accent btn-sm" onclick="openModal('addDamage')">+ Neuer Schaden</button>
-    </div>
-    <div class="dmg-search"><span class="si">🔍</span><input type="text" id="dmgSearch" placeholder="Kennzeichen, Name oder Nr..." oninput="filterDamages()"></div>
-    <div id="dmgLoading" class="loading" style="display:none"><div class="spinner"></div><div class="loading-text">Schäden werden geladen...</div></div>
-    <div id="dmgList" class="dmg-list"></div>
-    <div id="dmgDetail" style="display:none"></div>
-  </div>
-
-  <!-- TAB: GPS -->
-  <div class="tab-page" id="tabGps">
-    <div style="font-size:18px;font-weight:700;margin-bottom:16px">📍 GPS Fahrzeugortung</div>
-    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;box-shadow:var(--shadow)">
-      <div style="font-size:48px;margin-bottom:12px">🚗📡</div>
-      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">Vimcar GPS-Tracking</div>
-      <div style="font-size:13px;color:var(--text3);line-height:1.6">
-        Hier wird die Vimcar API integriert.<br>
-        Fahrzeugpositionen, Routen und Status in Echtzeit.
-      </div>
-      <div style="margin-top:20px;padding:12px 16px;background:var(--accent-light);border-radius:8px;font-size:12px;color:var(--accent);font-weight:600">
-        ⏳ In Entwicklung — Vimcar API kommt bald
-      </div>
-    </div>
-  </div>
-
-  <nav class="bottom-nav">
-    <button class="nav-item active" onclick="switchTab('bookings')" id="navBookings"><span class="nav-icon">🅿️</span>Buchungen</button>
-    <button class="nav-item" onclick="switchTab('gps')" id="navGps"><span class="nav-icon">📍</span>GPS</button>
-    <button class="nav-item" onclick="switchTab('tasks')" id="navTasks"><span class="nav-icon">📋</span>Aufgaben</button>
-    <button class="nav-item" onclick="switchTab('schedule')" id="navSchedule"><span class="nav-icon">📅</span>Dienstplan</button>
-    <button class="nav-item" onclick="switchTab('damages')" id="navDamages"><span class="nav-icon">🚨</span>Schäden</button>
-    <button class="nav-item admin-only" onclick="switchTab('admin')" id="navAdmin"><span class="nav-icon">⚙️</span>Admin</button>
-  </nav>
-</div>
-
-<div class="booking-detail-overlay" id="bookingDetailOverlay"></div>
-
-<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" id="modalContent"></div>
-</div>
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
-  <img id="lightboxImg" src="">
-  <div class="lightbox-info" id="lightboxInfo"></div>
-</div>
-<div class="toast" id="toast"></div>
-
-<script src="/app.js"></script>
-</body>
-</html>
+// ─── Notify all clients ────────────────────────────────────────────────
+async function notifyClients(data) {
+  const clients = await self.clients.matchAll({ type: 'window' });
+  clients.forEach(client => client.postMessage(data));
+}

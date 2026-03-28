@@ -1,4 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#CC6CE7"/>
-  <text x="256" y="360" font-size="320" font-weight="bold" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif">P</text>
-</svg>
+{
+  "name": "parkking-os",
+  "version": "1.0.0",
+  "description": "Park King OS — Parkplatz-Management System mit ParkingPro Integration",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^11.7.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "puppeteer": "^22.0.0",
+    "dotenv": "^16.4.1",
+    "multer": "^1.4.5-lts.1"
+  }
+}

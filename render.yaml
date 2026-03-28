@@ -1,32 +1,4 @@
-services:
-  - type: web
-    name: parkking-os
-    runtime: docker
-    plan: free
-    disk:
-      name: parkking-data
-      mountPath: /app/data
-      sizeGB: 1
-    envVars:
-      - key: PK_URL
-        sync: false
-      - key: PK_EMAIL
-        sync: false
-      - key: PK_PASSWORD
-        sync: false
-      - key: PSF_URL
-        sync: false
-      - key: PSF_EMAIL
-        sync: false
-      - key: PSF_PASSWORD
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
-      - key: APP_PASSWORD
-        sync: false
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: "true"
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: "/usr/bin/chromium"
-      - key: NODE_ENV
-        value: production
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#CC6CE7"/>
+  <text x="256" y="360" font-size="320" font-weight="bold" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif">P</text>
+</svg>

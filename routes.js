@@ -1,107 +1,79 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  Park King OS — Authentication (JWT + bcrypt)
+//  Park King OS — Server
+//  Parkplatz-Management System mit ParkingPro Integration
 // ═══════════════════════════════════════════════════════════════════════════
 
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { getDb } = require('./db');
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const { initSchema, seedDefaults } = require('./db');
+const { autoScrapeAll, closeBrowser } = require('./scraper');
+const routes = require('./routes');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'parkking-os-secret-change-me';
-const TOKEN_EXPIRY = '30d'; // 30 Tage eingeloggt bleiben
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ─── Generate token ─────────────────────────────────────────────────────
+// ─── Middleware ──────────────────────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
 
-function generateToken(user) {
-  return jwt.sign(
-    { id: user.id, username: user.username, role: user.role, name: user.display_name },
-    JWT_SECRET,
-    { expiresIn: TOKEN_EXPIRY }
-  );
-}
+// Service Worker must not be cached by the browser
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
+});
 
-// ─── Verify token ───────────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'data', 'uploads')));
 
-function verifyToken(token) {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
+// ─── API Routes ─────────────────────────────────────────────────────────
+app.use('/api', routes);
 
-// ─── Login ──────────────────────────────────────────────────────────────
+// ─── SPA Fallback ───────────────────────────────────────────────────────
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
 
-function login(username, password) {
-  const d = getDb();
-  const user = d.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
-  if (!user) return null;
-  if (!bcrypt.compareSync(password, user.password)) return null;
-  const token = generateToken(user);
-  return {
-    token,
-    user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name }
-  };
-}
+// ─── Initialize DB ──────────────────────────────────────────────────────
+initSchema();
+seedDefaults();
 
-// ─── Middleware: require auth ────────────────────────────────────────────
+// ─── Start Server ───────────────────────────────────────────────────────
+const AUTO_SCRAPE_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token fehlt' });
-  }
-  const token = authHeader.substring(7);
-  const decoded = verifyToken(token);
-  if (!decoded) {
-    return res.status(401).json({ error: 'Token ungültig oder abgelaufen' });
-  }
-  req.user = decoded;
-  next();
-}
+app.listen(PORT, () => {
+  console.log('');
+  console.log('  ╔══════════════════════════════════════╗');
+  console.log('  ║       🅿️  Park King OS v1.0.0        ║');
+  console.log('  ║    Parkplatz-Management System       ║');
+  console.log('  ╚══════════════════════════════════════╝');
+  console.log(`  → Port: ${PORT}`);
+  console.log(`  → DB:   ${process.env.DB_PATH || 'data/parkking.db'}`);
+  console.log(`  → Auto-Scrape: alle ${AUTO_SCRAPE_INTERVAL_MS / 1000 / 60} Minuten`);
+  console.log('');
 
-// ─── Middleware: require admin ───────────────────────────────────────────
+  // Auto-scrape on startup (15 sec delay for Chrome init)
+  setTimeout(() => {
+    console.log('[AutoScrape] Initial scrape starting...');
+    autoScrapeAll();
+  }, 15000);
 
-function requireAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin-Rechte erforderlich' });
-  }
-  next();
-}
+  // Auto-scrape interval
+  setInterval(() => {
+    console.log('[AutoScrape] Scheduled refresh...');
+    autoScrapeAll();
+  }, AUTO_SCRAPE_INTERVAL_MS);
+});
 
-// ─── User management ────────────────────────────────────────────────────
+// ─── Graceful Shutdown ──────────────────────────────────────────────────
+process.on('SIGTERM', async () => {
+  console.log('[Server] Shutting down...');
+  await closeBrowser();
+  process.exit(0);
+});
 
-function createUser(username, password, displayName, role) {
-  const d = getDb();
-  const hash = bcrypt.hashSync(password, 10);
-  const result = d.prepare('INSERT INTO users (username, password, display_name, role) VALUES (?, ?, ?, ?)')
-    .run(username, hash, displayName, role || 'staff');
-  return result.lastInsertRowid;
-}
-
-function updateUser(id, updates) {
-  const d = getDb();
-  const fields = [];
-  const values = [];
-
-  if (updates.display_name) { fields.push('display_name = ?'); values.push(updates.display_name); }
-  if (updates.role) { fields.push('role = ?'); values.push(updates.role); }
-  if (updates.active !== undefined) { fields.push('active = ?'); values.push(updates.active ? 1 : 0); }
-  if (updates.password) {
-    fields.push('password = ?');
-    values.push(bcrypt.hashSync(updates.password, 10));
-  }
-
-  if (!fields.length) return false;
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-
-  d.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return true;
-}
-
-function listUsers() {
-  const d = getDb();
-  return d.prepare('SELECT id, username, display_name, role, active, created_at FROM users ORDER BY role DESC, display_name').all();
-}
-
-module.exports = { login, generateToken, verifyToken, requireAuth, requireAdmin, createUser, updateUser, listUsers };
+process.on('SIGINT', async () => {
+  console.log('[Server] Interrupted...');
+  await closeBrowser();
+  process.exit(0);
+});
